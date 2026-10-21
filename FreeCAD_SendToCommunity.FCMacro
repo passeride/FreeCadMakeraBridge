@@ -1,0 +1,175 @@
+# -*- coding: utf-8 -*-
+"""Send a FreeCAD CAM Machine job to Carvera Community Controller's local inbox.
+
+Does not start the machine, change work offsets, or modify generated G-code.
+For automated uploads, enable the opt-in inbox consumer in passeride/Carvera_Controller.
+"""
+import datetime
+import hashlib
+import json
+import os
+import re
+import uuid
+from pathlib import Path
+
+APP_TITLE = "FreeCAD -> Carvera Community Controller"
+DEFAULT_INBOX = Path.home() / "Documents" / "Carvera-FreeCAD-Inbox"
+MAX_BYTES = 256 * 1024 * 1024
+
+
+def safe_name(raw):
+    return re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(raw)).strip("._-")[:65] or "CAM"
+
+
+def as_single_nc(result):
+    if not isinstance(result, (tuple, list)) or len(result) != 1:
+        raise RuntimeError("FreeCAD produserte mer enn én fil. Bruk en CAM-jobb med samlet utdata.")
+    section = result[0]
+    if not isinstance(section, (tuple, list)) or len(section) != 2:
+        raise RuntimeError("Ukjent svar fra FreeCAD-postprosessoren.")
+    _name, gcode = section
+    if not isinstance(gcode, str) or not gcode.strip():
+        raise RuntimeError("FreeCAD produserte ingen G-kode.")
+    if not re.search(r"\bG0?[0123]\b", gcode, re.I):
+        raise RuntimeError("Fant ingen G0/G1/G2/G3-bevegelser. Avbryter.")
+    return gcode.removeprefix("\n\n")
+
+
+def get_job():
+    import FreeCAD as App
+    import FreeCADGui as Gui
+    doc = App.ActiveDocument
+    if not doc:
+        raise RuntimeError("Åpne et dokument med CAM-jobb først.")
+    selected = Gui.Selection.getSelection()
+    if selected:
+        obj = selected[0]
+        if hasattr(obj, "Operations") and hasattr(obj, "Machine"):
+            return obj
+        try:
+            from PathScripts.PathUtils import findParentJob
+            job = findParentJob(obj)
+            if job:
+                return job
+        except (ImportError, AttributeError):
+            pass
+    jobs = [o for o in doc.Objects if hasattr(o, "Operations") and hasattr(o, "Machine")]
+    if len(jobs) == 1:
+        return jobs[0]
+    if not jobs:
+        raise RuntimeError("Fant ingen Machine-basert CAM-jobb i dokumentet.")
+    raise RuntimeError("Velg riktig CAM-jobb i modelltreet (flere jobber funnet).")
+
+
+def postprocess(job):
+    from Path.Post.Processor import PostProcessorFactory
+    from Machine.models.machine import MachineFactory
+    machine = MachineFactory.get_machine(job.Machine)
+    if machine is None:
+        raise RuntimeError("Ingen gyldig CAM Machine er valgt.")
+    name = machine.postprocessor_file_name
+    if not name:
+        raise RuntimeError("CAM Machine mangler valgt postprosessor.")
+    if not any(s in name.lower() for s in ("makera", "z1", "carvera")):
+        raise RuntimeError("Postprosessoren '%s' ser ikke ut som en Makera-postprosessor." % name)
+    job.Document.recompute()
+    post = PostProcessorFactory.get_post_processor(job, name)
+    if post is None or not hasattr(post, "export2"):
+        raise RuntimeError("Machine-postprosessoren '%s' er ikke tilgjengelig." % name)
+    return as_single_nc(post.export2()), name
+
+
+def enqueue(inbox, gcode, filename, select=True, send_request=True):
+    """Atomically write the .nc and then its upload request, never run the CNC."""
+    base = Path(inbox).expanduser().resolve()
+    base.mkdir(parents=True, exist_ok=True)
+    if filename != Path(filename).name or not filename.lower().endswith(".nc"):
+        raise ValueError("Ugyldig .nc-filnavn")
+    data = gcode.encode("utf-8")
+    if not (0 < len(data) <= MAX_BYTES):
+        raise ValueError("Filen er tom eller for stor")
+    file_path = base / filename
+    if file_path.exists():
+        raise FileExistsError("Filen finnes allerede: %s" % file_path)
+    nonce = uuid.uuid4().hex
+    tmp = base / (nonce + ".nc.part")
+    try:
+        with open(tmp, "xb") as out:
+            out.write(data)
+        os.replace(str(tmp), str(file_path))
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+    if not send_request:
+        return file_path, None
+    req = {
+        "schema": 1,
+        "id": nonce,
+        "filename": filename,
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "bytes": len(data),
+        "select": bool(select),
+        "created": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+    target = base / (nonce + ".request.json")
+    temp = base / (nonce + ".request.tmp")
+    with open(temp, "x", encoding="utf-8") as f:
+        json.dump(req, f, ensure_ascii=False, indent=2)
+    os.replace(str(temp), str(target))
+    return file_path, target
+
+
+def run():
+    import FreeCAD as App
+    from PySide import QtWidgets
+    try:
+        job = get_job()
+        dialog = QtWidgets.QDialog()
+        dialog.setWindowTitle(APP_TITLE)
+        layout = QtWidgets.QFormLayout(dialog)
+        layout.addRow("CAM-jobb:", QtWidgets.QLabel(job.Label))
+        prefs = App.ParamGet("User parameter:BaseApp/Preferences/Macro/SendToCommunity")
+        folder = QtWidgets.QLineEdit(prefs.GetString("Inbox", str(DEFAULT_INBOX)))
+        layout.addRow("Lokal innboks:", folder)
+        send = QtWidgets.QCheckBox("Automatisk opplasting via Community Controller-broen")
+        send.setChecked(prefs.GetBool("AutoQueue", False))
+        layout.addRow(send)
+        select = QtWidgets.QCheckBox("Velg filen i Controller etter opplasting")
+        select.setChecked(True)
+        select.setEnabled(send.isChecked())
+        send.toggled.connect(select.setEnabled)
+        layout.addRow(select)
+        note = QtWidgets.QLabel("Automatisk modus krever kildekodeversjonen av Community Controller med broen aktivert.\n"
+            "Uten automatisk modus eksporteres kun .nc til lokal mappe.\n"
+            "Makroen starter ikke fresing eller maskinbevegelser.")
+        note.setWordWrap(True)
+        layout.addRow(note)
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        buttons.button(QtWidgets.QDialogButtonBox.Ok).setText("Eksporter til innboks")
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addRow(buttons)
+        if dialog.exec_() != QtWidgets.QDialog.Accepted:
+            return
+        output, post_name = postprocess(job)
+        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        nc = "%s_%s_%s_%s.nc" % (
+            safe_name(job.Document.Label), safe_name(job.Label), stamp, uuid.uuid4().hex[:6])
+        file_path, req_path = enqueue(folder.text().strip(), output, nc,
+                                      select.isChecked(), send.isChecked())
+        prefs.SetString("Inbox", folder.text().strip())
+        prefs.SetBool("AutoQueue", send.isChecked())
+        App.Console.PrintMessage("Community Controller inbox: %s / %s\n" % (post_name, file_path))
+        if req_path:
+            info = ("Fil lagt i kø. IKKE bekreftet opplastet til Z1.\n"
+                    "Se *.done.json eller *.failed.json for overføringsstatus.")
+        else:
+            info = "Kun eksport. Bruk Upload and Select i Community Controller."
+        QtWidgets.QMessageBox.information(None, APP_TITLE, "Eksportert til:\n%s\n\n%s" % (file_path, info))
+    except Exception as exc:
+        App.Console.PrintError("SendToCommunity: %s\n" % exc)
+        QtWidgets.QMessageBox.critical(None, APP_TITLE, str(exc))
+
+
+if __name__ == "__main__" or "FreeCAD" in globals():
+    run()
