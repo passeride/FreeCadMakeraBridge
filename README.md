@@ -86,3 +86,16 @@ See [design vision](docs/design-vision.md) and
 
 Offline tests: `python -m unittest discover -s tests -v`.
 
+
+### When OpenSpindle is missing
+
+Before recomputing or exporting, the macro checks that the selected receiver
+exists and can be launched. An empty, removed or invalid application path offers
+**Finn installasjon**, **Åpne nedlastingsside**, **Eksporter bare fil**, and Cancel.
+Find checks common Windows/macOS locations and PATH before opening a file picker
+(on macOS, a directory picker for the .app bundle). The official releases page
+opens only on request; the addon never downloads or installs OpenSpindle.
+Closing the prompt cancels without exporting or changing the Job source ID.
+Export-only remains available with no receiver installed. If the application
+disappears or fails to launch after export, the NC snapshot remains available.
+Availability does not certify app identity/version or successful import.

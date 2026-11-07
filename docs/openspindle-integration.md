@@ -32,8 +32,13 @@ and remain a prerequisite for using that receiver; this new path bypasses it.
 5. Select a compatible OpenSpindle build. Verify cold launch and an already
    running instance on Windows. On macOS enter the .app path. Import must show
    the intended file; the macro itself reports only that opening was requested.
-6. Try a missing executable: the message must preserve the exported path and
-   allow manual import. Cancel the initial dialog: no export or source property.
+6. Try a missing executable before export: Find installation, Open download page,
+   Export only and Cancel must be offered. Cancel (or closing the prompt) must
+   create no export/source property. Download opens the official page only and
+   returns to the choice; it must not imply installation. Canceling the file
+   picker also returns to the choice. Export only must produce an NC snapshot
+   without trying to start OpenSpindle. Also test a launch failure after export:
+   the saved path remains available for manual import.
 7. In OpenSpindle check stock, work origin, tool assignment and the exact NC.
    Unknown or omitted movements in a preview must be investigated. Do not infer
    validation of machine geometry from the local manifest's existence.

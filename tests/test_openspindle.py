@@ -76,7 +76,7 @@ class HandoffTests(unittest.TestCase):
     def test_mac_bundle(self):
         with tempfile.TemporaryDirectory() as folder:
             app = Path(folder)/'OpenSpindle.app'
-            app.mkdir()
+            (app/'Contents'/'MacOS').mkdir(parents=True)
             nc = Path(folder)/'job.nc'; nc.touch()
             process = Mock()
             bridge.launch(app, nc, platform='darwin', popen=process)

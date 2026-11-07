@@ -3,11 +3,12 @@
 from pathlib import Path
 import importlib.util
 import runpy
+import sys
 
 
 def run():
     import FreeCAD as App
-    from PySide import QtWidgets
+    from PySide import QtWidgets, QtCore, QtGui
     title = "Klargjør på Z1 · OpenSpindle"
     try:
         # Keep all three files together in FreeCAD's macro directory.
@@ -23,11 +24,19 @@ def run():
         layout = QtWidgets.QFormLayout(dialog)
         layout.addRow("CAM-jobb:", QtWidgets.QLabel(job.Label))
         executable = QtWidgets.QLineEdit(prefs.GetString("Executable", ""))
-        browse = QtWidgets.QPushButton("Velg program…")
+        browse = QtWidgets.QPushButton("Finn installasjon…")
         def choose():
-            path, _ = QtWidgets.QFileDialog.getOpenFileName(dialog, "Velg OpenSpindle-programfil")
+            detected = bridge.discover_receiver()
+            if detected:
+                executable.setText(detected)
+                return detected
+            if sys.platform == 'darwin':
+                path = QtWidgets.QFileDialog.getExistingDirectory(dialog, "Velg OpenSpindle.app")
+            else:
+                path, _ = QtWidgets.QFileDialog.getOpenFileName(dialog, "Velg OpenSpindle-programfil")
             if path:
                 executable.setText(path)
+            return path
         browse.clicked.connect(choose)
         app_row = QtWidgets.QHBoxLayout()
         app_row.addWidget(executable)
@@ -52,6 +61,27 @@ def run():
             return
         if not folder.text().strip():
             raise ValueError("Velg en eksportmappe.")
+        def decide(reason):
+            prompt = QtWidgets.QMessageBox(dialog)
+            prompt.setWindowTitle("OpenSpindle er ikke tilgjengelig")
+            prompt.setText(reason)
+            prompt.setInformativeText("Finn programmet, åpne den offisielle nedlastingssiden eller eksporter bare fil. "
+                                      "Nedlastingssiden installerer ikke programmet automatisk."
+                                      + (" På Linux finnes det foreløpig ingen offisiell installasjonspakke." if sys.platform.startswith("linux") else ""))
+            find_button = prompt.addButton("Finn installasjon", QtWidgets.QMessageBox.ActionRole)
+            download_button = prompt.addButton("Åpne nedlastingsside", QtWidgets.QMessageBox.ActionRole)
+            export_button = prompt.addButton("Eksporter bare fil", QtWidgets.QMessageBox.AcceptRole)
+            prompt.addButton(QtWidgets.QMessageBox.Cancel)
+            prompt.exec_()
+            return {find_button: 'find', download_button: 'download', export_button: 'export'}.get(prompt.clickedButton(), 'cancel')
+        def download(url):
+            if not QtGui.QDesktopServices.openUrl(QtCore.QUrl(url)):
+                QtWidgets.QMessageBox.warning(dialog, title, "Kunne ikke åpne nettleseren. Åpne: " + url)
+        receiver = bridge.configure_receiver(executable.text().strip(), opening.isChecked(), decide, choose, download)
+        if receiver is None:
+            return
+        app_path, should_open = receiver
+        executable.setText(app_path)
         bridge.check_job(job)
         gcode, post = community["postprocess"](job)
         bridge.check_job(job)
@@ -60,7 +90,7 @@ def run():
         prefs.SetString("Executable", executable.text().strip())
         prefs.SetString("Exports", folder.text().strip())
         message = "Eksportert lokalt: %s\nRevisjon: %s" % (path, manifest["program"]["sha256"][:12])
-        if opening.isChecked():
+        if should_open:
             try:
                 bridge.launch(executable.text().strip(), path)
                 message += "\nÅpning forespurt. Kontroller importen i OpenSpindle."

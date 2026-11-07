@@ -56,21 +56,79 @@ def publish(folder, gcode, source):
     return final / (label + ".nc"), manifest
 
 
-def launch(executable, nc_path, platform=None, popen=subprocess.Popen):
-    """Ask the app to open one NC file, without a shell or run flags.
+DOWNLOAD_URL = "https://github.com/openspindle/openspindle/releases"
 
-    Process launch is not an import acknowledgement. macOS bundles use `open`.
-    """
+
+def receiver_path(executable, platform=None):
+    """Check local availability only, not app identity/version or import support."""
     platform = platform or sys.platform
+    if not str(executable).strip():
+        raise ValueError("OpenSpindle er ikke konfigurert.")
     app = Path(executable).expanduser().resolve()
+    if platform == "darwin" and app.suffix.lower() == ".app" and app.is_dir():
+        if not (app/'Contents'/'MacOS').is_dir():
+            raise ValueError("Velg en gyldig OpenSpindle.app-pakke.")
+        return app
+    if not app.is_file() or (platform != 'win32' and not os.access(app, os.X_OK)):
+        raise ValueError("OpenSpindle-programfilen finnes ikke eller kan ikke kjøres.")
+    return app
+
+
+def discover_receiver(platform=None, environ=None):
+    platform = platform or sys.platform
+    environ = os.environ if environ is None else environ
+    candidates = []
+    if platform == 'win32':
+        for key, suffix in [('LOCALAPPDATA', 'Programs/openspindle/OpenSpindle.exe'),
+                            ('PROGRAMFILES', 'OpenSpindle/OpenSpindle.exe')]:
+            if environ.get(key):
+                candidates.append(Path(environ[key])/suffix)
+    elif platform == 'darwin':
+        candidates = [Path('/Applications/OpenSpindle.app'), Path.home()/'Applications/OpenSpindle.app']
+    for name in ('openspindle', 'OpenSpindle'):
+        found = shutil.which(name)
+        if found:
+            candidates.append(Path(found))
+    for candidate in candidates:
+        try:
+            return str(receiver_path(candidate, platform))
+        except ValueError:
+            pass
+    return ''
+
+
+def configure_receiver(executable, opening, decide, find, download, platform=None):
+    """Resolve a missing receiver before export; None means no export allowed.
+
+    Callbacks keep UI separate and never install software or start a machine.
+    """
+    if not opening:
+        return executable, False
+    while True:
+        try:
+            return str(receiver_path(executable, platform)), True
+        except ValueError as exc:
+            action = decide(str(exc))
+        if action == 'export':
+            return executable, False
+        if action == 'find':
+            executable = find() or executable
+        elif action == 'download':
+            download(DOWNLOAD_URL)
+        else:
+            return None
+
+
+def launch(executable, nc_path, platform=None, popen=subprocess.Popen):
+    """Ask the app to open one NC file; launch is not an import acknowledgement."""
+    platform = platform or sys.platform
+    app = receiver_path(executable, platform)
     nc = Path(nc_path).resolve(strict=True)
     if nc.suffix.lower() != ".nc":
         raise ValueError("Velg en .nc-fil.")
-    if platform == "darwin" and app.suffix.lower() == ".app" and app.is_dir():
+    if platform == "darwin" and app.suffix.lower() == ".app":
         args = ["/usr/bin/open", "-a", str(app), str(nc)]
     else:
-        if not app.is_file():
-            raise ValueError("Velg OpenSpindle-programfilen først.")
         args = [str(app), str(nc)]
     return popen(args, shell=False)
 
