@@ -1,0 +1,12 @@
+# -*- coding: utf-8 -*-
+"""Run from the extracted download: Macro > Macros > select this file."""
+from pathlib import Path
+import runpy
+from PySide import QtWidgets
+try:
+    source = Path(__file__).resolve().parent
+    installer = runpy.run_path(str(source / 'bridge_installer.py'), run_name='bridge_install_helpers')
+    installer['gui'](source)
+except Exception as exc:
+    QtWidgets.QMessageBox.critical(None, 'FreeCAD Makera Bridge',
+        'Pakk ut hele ZIP-filen før installasjon.\n' + str(exc))

@@ -27,13 +27,24 @@ Review G-code, work offsets, tool clearance, and Scan Machining Area before manu
 
 ## OpenSpindle: Klargjør på Z1
 
-Copy `FreeCAD_SendToOpenSpindle.FCMacro`, `openspindle_bridge.py` and
-`FreeCAD_SendToCommunity.FCMacro` together into FreeCAD's macro directory.
-Run the OpenSpindle macro with your CAM Machine Job selected. Choose the
-OpenSpindle executable using **Velg program…**, then **Klargjør på Z1**.
-On macOS enter the full `.app` bundle path in the field. You can untick opening
-to export only. The paths are remembered. The existing Community macro is
-loaded only for its Job/postprocessor helpers; its queue UI is not executed.
+Download the installation ZIP from the PR's **Handoff tests** Actions run
+(artifact **FreeCADMakeraBridge-install**), then extract the whole ZIP.
+In FreeCAD open **Macro → Macros**, browse to the extracted folder and run
+`Install_FreeCADMakeraBridge.FCMacro`. Choose **Installer / oppdater**.
+The installer uses FreeCAD's configured macro directory and needs no admin rights.
+Run `Klargjor_pa_Z1` from the normal macro list afterwards. You can attach this
+stable launcher to a toolbar through FreeCAD's macro customization.
+
+For updates, close other FreeCAD windows, download and extract the new package,
+then run its installer again. Runtime files are installed together in a versioned
+folder and activated with one atomic pointer change. The previous version is
+retained. **Gå tilbake til forrige versjon** restores it. Exported jobs and FreeCAD
+preferences (OpenSpindle path and export directory) are kept. No network updater
+runs inside FreeCAD. See [installation and updates](docs/installation.md).
+
+Select your CAM Job and run `Klargjor_pa_Z1`. Choose the OpenSpindle executable
+using **Velg program…**, then **Klargjør på Z1**. On macOS enter the full `.app`
+bundle path in the field. Untick opening to export only. The paths are remembered.
 
 Requires FreeCAD's Machine-based CAM `export2` API and a configured Makera
 postprocessor. Legacy FreeCAD 1.1 jobs are not supported by this macro.
