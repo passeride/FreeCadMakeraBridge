@@ -1,0 +1,77 @@
+# -*- coding: utf-8 -*-
+"""Klargjør på Z1: export one CAM Machine job and open it in OpenSpindle."""
+from pathlib import Path
+import importlib.util
+import runpy
+
+
+def run():
+    import FreeCAD as App
+    from PySide import QtWidgets
+    title = "Klargjør på Z1 · OpenSpindle"
+    try:
+        # Keep all three files together in FreeCAD's macro directory.
+        here = Path(__file__).resolve().parent
+        spec = importlib.util.spec_from_file_location("openspindle_bridge", here / "openspindle_bridge.py")
+        bridge = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(bridge)
+        community = runpy.run_path(str(here / "FreeCAD_SendToCommunity.FCMacro"), run_name="bridge_helpers")
+        job = community["get_job"]()
+        prefs = App.ParamGet("User parameter:BaseApp/Preferences/Macro/SendToOpenSpindle")
+        dialog = QtWidgets.QDialog()
+        dialog.setWindowTitle(title)
+        layout = QtWidgets.QFormLayout(dialog)
+        layout.addRow("CAM-jobb:", QtWidgets.QLabel(job.Label))
+        executable = QtWidgets.QLineEdit(prefs.GetString("Executable", ""))
+        browse = QtWidgets.QPushButton("Velg program…")
+        def choose():
+            path, _ = QtWidgets.QFileDialog.getOpenFileName(dialog, "Velg OpenSpindle-programfil")
+            if path:
+                executable.setText(path)
+        browse.clicked.connect(choose)
+        app_row = QtWidgets.QHBoxLayout()
+        app_row.addWidget(executable)
+        app_row.addWidget(browse)
+        layout.addRow("OpenSpindle:", app_row)
+        folder = QtWidgets.QLineEdit(prefs.GetString("Exports", str(Path.home() / "Documents" / "FreeCAD-OpenSpindle")))
+        layout.addRow("Eksportmappe:", folder)
+        opening = QtWidgets.QCheckBox("Åpne eksporten i OpenSpindle")
+        opening.setChecked(True)
+        layout.addRow(opening)
+        note = QtWidgets.QLabel("G-koden åpnes for kontroll. Oppsett, nullpunkt og verktøy må bekreftes i OpenSpindle.\n"
+                               "Import og maskinoverføring bekreftes ikke av denne makroen.\n"
+                               "En kilde-ID lagres som egenskap på CAM-jobben; lagre dokumentet for å beholde den.")
+        note.setWordWrap(True)
+        layout.addRow(note)
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        buttons.button(QtWidgets.QDialogButtonBox.Ok).setText("Klargjør på Z1")
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addRow(buttons)
+        if dialog.exec_() != QtWidgets.QDialog.Accepted:
+            return
+        if not folder.text().strip():
+            raise ValueError("Velg en eksportmappe.")
+        bridge.check_job(job)
+        gcode, post = community["postprocess"](job)
+        bridge.check_job(job)
+        source = bridge.source_metadata(job, post, App.Version())
+        path, manifest = bridge.publish(folder.text().strip(), gcode, source)
+        prefs.SetString("Executable", executable.text().strip())
+        prefs.SetString("Exports", folder.text().strip())
+        message = "Eksportert lokalt: %s\nRevisjon: %s" % (path, manifest["program"]["sha256"][:12])
+        if opening.isChecked():
+            try:
+                bridge.launch(executable.text().strip(), path)
+                message += "\nÅpning forespurt. Kontroller importen i OpenSpindle."
+            except Exception as exc:
+                QtWidgets.QMessageBox.warning(dialog, title, message + "\nKunne ikke åpne OpenSpindle: %s\nÅpne .nc-filen manuelt." % exc)
+                return
+        QtWidgets.QMessageBox.information(dialog, title, message)
+    except Exception as exc:
+        App.Console.PrintError("OpenSpindle: %s\n" % exc)
+        QtWidgets.QMessageBox.critical(None, title, str(exc))
+
+
+if __name__ == "__main__" or "FreeCAD" in globals():
+    run()
