@@ -25,6 +25,16 @@ Status files: `.request.json` pending, `.processing.json` claimed, `.done.json` 
 
 Review G-code, work offsets, tool clearance, and Scan Machining Area before manually starting the machine.
 
+## Addon Manager (experimental)
+
+This PR includes a namespaced **Makera Bridge** workbench and package.xml.
+Install through Addon Manager using this repository as a custom repository on
+branch `feat/openspindle-handoff`, then restart FreeCAD and select **Makera Bridge**.
+Updates are managed by Addon Manager. See [addon installation and official
+publication requirements](docs/addon-manager.md). This is not yet listed in the
+official catalog and still needs real FreeCAD GUI validation. MIT licensing is
+proposed by this PR. The standalone macro installer below remains an alternative.
+
 ## OpenSpindle: Klargjør på Z1
 
 Download the installation ZIP from the PR's **Handoff tests** Actions run
