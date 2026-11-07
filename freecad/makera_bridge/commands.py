@@ -1,4 +1,4 @@
-"""Commands owned by the Makera Bridge workbench."""
+"""Lightweight command registered for the CAM toolbar."""
 from pathlib import Path
 import runpy
 

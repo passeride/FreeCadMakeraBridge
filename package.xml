@@ -16,5 +16,5 @@
   <tag>CAM</tag>
   <tag>CNC</tag>
   <tag>Makera</tag>
-  <content><workbench><classname>MakeraBridgeWorkbench</classname></workbench></content>
+  <content><other/></content>
 </package>

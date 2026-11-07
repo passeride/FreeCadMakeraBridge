@@ -2,16 +2,25 @@
 
 ## Experimental installation from our repository
 
-This addon is not in the official FreeCAD catalog yet. In Addon Manager's
-custom-repository settings add:
+This addon is not in the official FreeCAD catalog yet.
 
-- Repository: https://github.com/passeride/FreeCadMakeraBridge
-- Branch: feat/openspindle-handoff
+1. Open **Tools → Addon Manager** in FreeCAD.
+2. Open its preferences/settings and find **Custom repositories**. The settings
+   location and labels can differ between Addon Manager versions.
+3. Add repository `https://github.com/passeride/FreeCadMakeraBridge` and select
+   branch `feat/openspindle-handoff`. Use the branch field if shown; do not leave
+   it on main, which does not contain the addon until the PR is merged.
+4. Refresh the addon list, select **FreeCADMakeraBridge** and install it.
+5. Restart FreeCAD, activate **CAM**, and show the **Makera Bridge** toolbar if
+   you previously hid it. It contains one **Klargjør på Z1** button.
+6. Select your CAM Job and click the button. Choose the OpenSpindle executable
+   on the first run. Its path and export directory are remembered.
 
-Refresh the catalog, install FreeCADMakeraBridge and restart FreeCAD. Select
-**Makera Bridge** in the workbench selector and use **Klargjør på Z1** on its
-toolbar. The command reuses the existing OpenSpindle dialog and preferences.
-No separate macro installer is needed with this installation method.
+There is no additional workbench to select. The addon contributes a small
+CAM-only toolbar using FreeCAD's workbench-manipulator API, available since 1.0.
+The internal CAMWorkbench name and legacy PathWorkbench alias are recognized.
+Other workbenches receive no toolbar changes. No separate macro installer is
+needed with this installation method.
 
 The installed FreeCAD must have Machine-based CAM and the export2 API. The
 manifest minimum is a baseline loader requirement, not a promise that legacy
@@ -26,7 +35,7 @@ installer to update this checkout: choose one installation method. If migrating
 from the macro installer, remove its launcher and private runtime directory after
 verifying the addon works; your preferences and exports are shared and retained.
 
-Removing the addon through Addon Manager removes the workbench on the next
+Removing the addon through Addon Manager removes the CAM toolbar on the next
 restart. It does not delete CAD documents, exports or FreeCAD preferences.
 Addon Manager owns checkout updates; the standalone installer's rollback button
 only affects its separate macro installation. To roll back the addon use an
@@ -43,7 +52,7 @@ claims are unsuitable for indexing.
 
 Before submitting:
 
-1. Test installation, restart, workbench activation, export, OpenSpindle opening,
+1. Test installation, restart, CAM toolbar activation, export, OpenSpindle opening,
    updates and removal in actual supported FreeCAD builds. Record versions.
 2. Verify the manifest against the current FreeCAD manifest schema, and verify
    its version requirements against the tested CAM API versions.
@@ -63,3 +72,5 @@ Sources:
 - https://github.com/FreeCAD/Addon-Academy/blob/main/Source/Guides/Publishing/Indexed.md
 - https://github.com/FreeCAD/Addon-Academy/blob/main/Source/Topics/Addon-Index/Index/Qualities.md
 - https://github.com/FreeCAD/Addon-Academy/blob/main/Source/Guides/Code/Workbench/index.md
+
+Toolbar API reference: https://github.com/FreeCAD/Addon-Academy/blob/main/Source/Guides/Code/Manipulators/index.md

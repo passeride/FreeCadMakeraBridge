@@ -13,25 +13,37 @@ class AddonTests(unittest.TestCase):
         tree = ET.parse(root/'package.xml')
         ns = {'p': 'https://wiki.freecad.org/Package_Metadata'}
         self.assertEqual(tree.find('p:version', ns).text, (root/'VERSION').read_text().strip())
-        self.assertEqual(tree.find('p:content/p:workbench/p:classname', ns).text, 'MakeraBridgeWorkbench')
+        self.assertIsNotNone(tree.find('p:content/p:other', ns))
+        self.assertIsNone(tree.find('p:content/p:workbench', ns))
         self.assertTrue((root/tree.find('p:icon', ns).text).is_file())
         self.assertTrue((root/tree.find('p:license', ns).attrib['file']).is_file())
 
-    def test_registration_is_lazy_and_creates_own_toolbar(self):
+    def test_toolbar_is_scoped_to_cam_without_extra_workbench(self):
         gui = types.ModuleType('FreeCADGui')
-        gui.Workbench = type('Workbench', (), {'appendToolbar': Mock(), 'appendMenu': Mock()})
-        gui.addWorkbench = Mock(); gui.addCommand = Mock()
+        gui.addWorkbench = Mock()
+        gui.addCommand = Mock()
+        gui.addWorkbenchManipulator = Mock()
+        cam, part, path = object(), object(), object()
+        gui.listWorkbenches = Mock(return_value={'CAMWorkbench': cam, 'PartWorkbench': part, 'PathWorkbench': path})
+        gui.activeWorkbench = Mock(return_value=cam)
         with patch.dict(sys.modules, {'FreeCADGui': gui}):
             name = 'freecad.makera_bridge.init_gui'
             sys.modules.pop(name, None)
             module = importlib.import_module(name)
-            gui.addWorkbench.assert_called_once()
-            gui.addCommand.assert_not_called()
-            wb = module.MakeraBridgeWorkbench()
-            wb.Initialize()
+            gui.addWorkbench.assert_not_called()
             gui.addCommand.assert_called_once()
-            self.assertEqual(gui.addCommand.call_args.args[0], 'MakeraBridge_Prepare')
-            self.assertEqual(wb.GetClassName(), 'Gui::PythonWorkbench')
+            gui.addWorkbenchManipulator.assert_called_once_with(module.manipulator)
+            expected = [{'append': 'Makera Bridge', 'toolBar': ''},
+                        {'append': 'MakeraBridge_Prepare', 'toolBar': 'Makera Bridge'}]
+            self.assertEqual(module.manipulator.modifyToolBars(), expected)
+            # Re-activation yields the same declarative tree, not growing UI state.
+            self.assertEqual(module.manipulator.modifyToolBars(), expected)
+            gui.activeWorkbench.return_value = part
+            self.assertEqual(module.manipulator.modifyToolBars(), [])
+            gui.activeWorkbench.return_value = path
+            self.assertEqual(module.manipulator.modifyToolBars(), expected)
+            gui.activeWorkbench.return_value = None
+            self.assertEqual(module.manipulator.modifyToolBars(), [])
 
     def test_command_uses_bundled_macro_without_installer(self):
         from freecad.makera_bridge.commands import PrepareCommand

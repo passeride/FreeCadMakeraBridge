@@ -27,9 +27,10 @@ Review G-code, work offsets, tool clearance, and Scan Machining Area before manu
 
 ## Addon Manager (experimental)
 
-This PR includes a namespaced **Makera Bridge** workbench and package.xml.
+This PR includes a namespaced CAM extension and package.xml.
 Install through Addon Manager using this repository as a custom repository on
-branch `feat/openspindle-handoff`, then restart FreeCAD and select **Makera Bridge**.
+branch `feat/openspindle-handoff`, then restart FreeCAD and activate **CAM**. The **Makera Bridge** toolbar contains
+one **Klargjør på Z1** button; no additional workbench is registered.
 Updates are managed by Addon Manager. See [addon installation and official
 publication requirements](docs/addon-manager.md). This is not yet listed in the
 official catalog and still needs real FreeCAD GUI validation. MIT licensing is
