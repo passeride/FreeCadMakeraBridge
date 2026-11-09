@@ -29,13 +29,28 @@ def validate_nc(gcode):
     return data
 
 
+def export_label(source):
+    job = source["job_label"].strip()
+    if job and not re.fullmatch(r"Job(?:\s*\(?\d+\)?)?", job, re.I):
+        return job
+    document = source.get("document_label", "").strip()
+    operations = source.get("operations", [])
+    operation = operations[0]["label"].strip() if len(operations) == 1 else ""
+    if document and operation and document.casefold() != operation.casefold():
+        return f"{document} - {operation}"
+    return document or operation or "CAM"
+
+
 def publish(folder, gcode, source):
-    """Publish a complete snapshot directory atomically; preserve NC bytes."""
+    """Publish a complete snapshot directory atomically."""
     data = validate_nc(gcode)
     base = Path(folder).expanduser().resolve()
     base.mkdir(parents=True, exist_ok=True)
     revision = hashlib.sha256(data).hexdigest()
-    label = re.sub(r"[^a-zA-Z0-9_.-]+", "_", source["job_label"]).strip("._-")[:50] or "Job"
+    label = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", export_label(source))
+    label = label[:50].strip(" ._-") or "CAM"
+    if re.fullmatch(r"(?:CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])(?:\..*)?", label, re.I):
+        label = "_" + label
     snapshot_id = uuid.uuid4().hex
     staging = Path(tempfile.mkdtemp(prefix=".export-", dir=base))
     final = base / (label + "_" + revision[:12] + "_" + snapshot_id[:8])
@@ -144,7 +159,42 @@ def check_job(job):
         raise ValueError("Dokumentet har feil eller uoppdaterte objekter: " + ", ".join(invalid))
 
 
-def source_metadata(job, postprocessor, freecad_version):
+def with_tool_comments(gcode, controllers):
+    """Keep native Makera descriptors and supply the same format for older posts."""
+    if re.search(r"^\s*(?:\(|;)\s*@FC\|TOOL\|", gcode, re.I | re.M):
+        return gcode
+    comments = {}
+    for controller in controllers:
+        number = getattr(controller, "ToolNumber", None)
+        tool = getattr(controller, "Tool", None)
+        if tool is None or not isinstance(number, int) or not 0 < number <= 999999:
+            continue
+        # These are FreeCAD's internal units. They do not depend on G20/G21.
+        shape = re.sub(r"[^a-zA-Z0-9_-]", "", str(getattr(tool, "ShapeType", "")))
+        fields = [f"number={number}", "unit=mm", f"type={shape or 'unknown'}"]
+        name = re.sub(r"[^ -~]|[()|;]", " ", str(tool.Label))[:120].strip()
+        if name:
+            fields.append(f"name={name}")
+        for key, properties in (("diameter", ("Diameter",)), ("tipdiameter", ("TipDiameter",)),
+                                ("tipangle", ("TipAngle",)), ("cuttingedgeangle", ("CuttingEdgeAngle",)),
+                                ("flutelength", ("CuttingEdgeHeight", "CuttingEdgeLength"))):
+            quantity = next((getattr(tool, prop) for prop in properties if hasattr(tool, prop)), None)
+            value = getattr(quantity, "Value", quantity)
+            if isinstance(value, (float, int)) and math.isfinite(value):
+                fields.append(f"{key}={value:.9g}")
+        comments["(@FC|TOOL|" + "|".join(fields) + ")"] = None
+    if not comments:
+        return gcode
+    newline = "\r\n" if "\r\n" in gcode else "\n"
+    # Keep a leading delimiter first for posts that use one.
+    first, separator, rest = gcode.partition(newline)
+    header = newline.join(comments) + newline
+    if first.strip() == "%" and separator:
+        return first + separator + header + rest
+    return header + gcode
+
+
+def source_metadata(job, postprocessor, freecad_version, operations):
     # This property is saved with the CAM Job. Copying a job must give a new ID.
     if "OpenSpindleSourceId" not in job.PropertiesList:
         job.addProperty("App::PropertyString", "OpenSpindleSourceId", "OpenSpindle",
@@ -161,7 +211,7 @@ def source_metadata(job, postprocessor, freecad_version):
         "document_saved": bool(job.Document.FileName),
         "freecad_version": list(freecad_version), "postprocessor": postprocessor,
         "operations": [{"name": o.Name, "label": o.Label}
-                       for o in job.Operations.Group],
+                       for o in operations],
     }
 
 
@@ -246,6 +296,7 @@ def run():
     from PySide import QtWidgets, QtCore, QtGui
     title = "Klargjør på Z1 · OpenSpindle"
     try:
+        from Path.Base import Util as PathUtil
         job = get_job()
         prefs = App.ParamGet("User parameter:BaseApp/Preferences/Macro/SendToOpenSpindle")
         dialog = QtWidgets.QDialog()
@@ -314,8 +365,10 @@ def run():
         check_job(job)
         gcode, post = postprocess(job)
         check_job(job)
-        source = source_metadata(job, post, App.Version())
-        path, manifest = publish(folder.text().strip(), gcode, source)
+        operations = [op for op in job.Operations.Group if PathUtil.activeForOp(op)]
+        source = source_metadata(job, post, App.Version(), operations)
+        controllers = (PathUtil.toolControllerForOp(op) for op in operations)
+        path, manifest = publish(folder.text().strip(), with_tool_comments(gcode, controllers), source)
         prefs.SetString("Executable", executable.text().strip())
         prefs.SetString("Exports", folder.text().strip())
         message = "Eksportert lokalt: %s\nRevisjon: %s" % (path, manifest["program"]["sha256"][:12])

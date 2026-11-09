@@ -14,7 +14,8 @@ and remain a prerequisite for using that receiver; this new path bypasses it.
 | Honest handoff status and recoverable launch failure | Implemented |
 | Import acknowledgement, paired local API | Future OpenSpindle adapter work |
 | Updating existing operations from FreeCAD | Future; current import can create another plate/operation |
-| Stock, WCS, fixture geometry and tool synchronization | Future; configure and inspect in OpenSpindle |
+| Tool identification | FreeCAD tool descriptors can match cutters already in the OpenSpindle library |
+| Stock, WCS and fixture geometry | Configure and inspect in OpenSpindle |
 | Post version verification and machine capability binding | Future; current guard checks configured post name only |
 | Machine panel, collision verification, job history | Future; controlled by receiver implementation |
 | Physical machine validation | Required; not performed |
@@ -25,14 +26,17 @@ and remain a prerequisite for using that receiver; this new path bypasses it.
    select CAM, and click **Klargjør på Z1** on the Makera Bridge toolbar.
 2. Use a Machine-based CAM Job with the intended Makera post. Include profile
    tabs, a pocket, drilling and multiple tools in representative test jobs.
-3. Run the new macro with opening disabled. Compare the NC against the normal
-   post export, including tabs and tool changes. Inspect handoff.json and verify
-   the byte count and SHA-256. The source ID property makes the document modified.
+3. Run the new macro with opening disabled. Compare the executable NC blocks
+   against the normal post export, including tabs and tool changes. Inspect
+   handoff.json and verify the byte count and SHA-256. The source ID property
+   makes the document modified.
 4. Export the same job twice: distinct folders, identical program hash. Modify
    a toolpath and export again: the program hash must change.
 5. Select a compatible OpenSpindle build. Verify cold launch and an already
    running instance on Windows. On macOS enter the .app path. Import must show
-   the intended file; the macro itself reports only that opening was requested.
+   the intended file. A custom CAM job label names the file. For a default Job
+   label the file uses the document name and, for a single active operation,
+   its label. The macro reports when it has requested opening the file.
 6. Try a missing executable before export: Find installation, Open download page,
    Export only and Cancel must be offered. Cancel (or closing the prompt) must
    create no export/source property. Download opens the official page only and
@@ -53,6 +57,11 @@ and remain a prerequisite for using that receiver; this new path bypasses it.
 The bridge's handoff.json is schema freecad-openspindle-handoff/1. Status is
 always exported_locally; it must not be used to authorize machining. Program
 revision covers NC bytes only. Operation names have no NC line mapping yet.
+The export keeps native Makera FreeCAD tool descriptors. If the post emits none,
+the addon adds `@FC|TOOL` comments from the tool controllers of active operations.
+OpenSpindle can match supported cutters with compatible geometry in its active
+library. Review the assigned tools before running a job. Missing, incompatible
+or ambiguous cutters need a manual assignment.
 No stock/WCS comments are injected because coordinates cannot safely be inferred
 from an arbitrary document-space bounding box. Future geometry transfer must
 explicitly transform to the Job's postprocessor coordinate system.

@@ -1,12 +1,37 @@
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
 from freecad.makera_bridge import commands as bridge
 
 
 class HandoffTests(unittest.TestCase):
+    def test_default_job_uses_document_and_single_operation(self):
+        source = {'job_label': 'Job (001)', 'document_label': 'Skilt til André',
+                  'operations': [{'label': 'V-Carve'}]}
+        with tempfile.TemporaryDirectory() as folder:
+            nc, _ = bridge.publish(folder, 'G1X1', source)
+            self.assertEqual(nc.name, 'Skilt til André - V-Carve.nc')
+        source['operations'].append({'label': 'Profil'})
+        self.assertEqual(bridge.export_label(source), 'Skilt til André')
+        self.assertEqual(bridge.export_label({**source, 'job_label': 'Finish pass'}), 'Finish pass')
+
+    def test_tool_comments_keep_native_markers_and_motion_bytes(self):
+        tool = SimpleNamespace(Label='V-bit (90°)', ShapeType='VBit',
+                               Diameter=SimpleNamespace(Value=3.175), TipDiameter=0.1,
+                               CuttingEdgeAngle=90)
+        controller = SimpleNamespace(Tool=tool, ToolNumber=2)
+        code = '%\r\nG20\r\nT2 M6\r\nG1 X1\r\n%\r\n'
+        marked = bridge.with_tool_comments(code, [controller, controller])
+        self.assertEqual(marked.count('@FC|TOOL|'), 1)
+        self.assertIn('number=2|unit=mm|type=VBit', marked)
+        self.assertIn('diameter=3.175|tipdiameter=0.1|cuttingedgeangle=90', marked)
+        lines = marked.splitlines(keepends=True)
+        self.assertEqual(lines[0] + ''.join(lines[2:]), code)
+        self.assertEqual(bridge.with_tool_comments(marked, [controller]), marked)
+
     def test_snapshot_preserves_code_and_revision_without_overwriting(self):
         with tempfile.TemporaryDirectory() as folder:
             code = '(tabs)\nG21\nG1X1Z0.5\nG1X2Z-1\n'
@@ -53,7 +78,6 @@ class HandoffTests(unittest.TestCase):
             self.assertEqual(list(Path(folder).iterdir()), [])
 
     def test_source_id_persists_and_copied_jobs_get_a_new_identity(self):
-        from types import SimpleNamespace
         class Job:
             def addProperty(self, *args):
                 self.PropertiesList.append(args[1])
@@ -66,12 +90,12 @@ class HandoffTests(unittest.TestCase):
         job.Label = 'Pocket'
         job.Operations = SimpleNamespace(Group=[])
         doc.Objects = [job]
-        first = bridge.source_metadata(job, 'makera', ['26', '3'])
-        self.assertEqual(first['id'], bridge.source_metadata(job, 'makera', [])['id'])
+        first = bridge.source_metadata(job, 'makera', ['26', '3'], [])
+        self.assertEqual(first['id'], bridge.source_metadata(job, 'makera', [], [])['id'])
         self.assertFalse(first['document_saved'])
         duplicate = SimpleNamespace(OpenSpindleSourceId=first['id'])
         doc.Objects.append(duplicate)
-        self.assertNotEqual(first['id'], bridge.source_metadata(job, 'makera', [])['id'])
+        self.assertNotEqual(first['id'], bridge.source_metadata(job, 'makera', [], [])['id'])
 
     def test_mac_bundle(self):
         with tempfile.TemporaryDirectory() as folder:
