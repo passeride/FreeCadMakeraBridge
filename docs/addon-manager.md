@@ -31,7 +31,7 @@ on the user's FreeCAD build.
 
 For updates use Addon Manager's update operation and restart FreeCAD. If a
 previous installation still reports a missing `FreeCAD_SendToOpenSpindle.FCMacro`
-or `freecad.makera_bridge.handoff`, update to 0.2.2 and restart FreeCAD.
+or `freecad.makera_bridge.handoff`, update to the latest version and restart FreeCAD.
 If the update does not appear, reinstall the addon from the configured branch. Use the
 CAM toolbar button after restarting. Addon Manager may copy a launcher macro
 to a different FreeCAD Macro directory. The toolbar loads the Python dialog

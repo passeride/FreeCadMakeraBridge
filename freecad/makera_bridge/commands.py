@@ -2,6 +2,7 @@
 import datetime
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -9,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import traceback
 import uuid
 
 MAX_BYTES = 10 * 1024 * 1024
@@ -203,6 +205,29 @@ def postprocess(job):
     post = PostProcessorFactory.get_post_processor(job, name)
     if post is None or not hasattr(post, "export2"):
         raise RuntimeError("Machine-postprosessoren '%s' er ikke tilgjengelig." % name)
+    # The unified FreeCAD dialog applies the bundle before export2. The base
+    # post may initialize toolhead limits to None when the machine omits them,
+    # even when the Makera post declares a numeric minimum in its own schema.
+    apply_bundle = getattr(post, "apply_configuration_bundle", None)
+    if callable(apply_bundle):
+        post._machine = machine
+        apply_bundle()
+        for property_name in ("min_spindle_speed", "min_feed_rate"):
+            if property_name not in machine.postprocessor_properties:
+                continue
+            key = property_name.upper()
+            if post.values.get(key) is not None:
+                continue
+            value = machine.postprocessor_properties[property_name]
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value < 0
+            ):
+                raise ValueError(f"Postprosessorens {property_name} må være et gyldig tall.")
+            post.values[key] = value
+        post._bundle_applied = True
     result = post.export2()
     if not result:
         raise RuntimeError("Postprosessoren returnerte ingen G-kode.")
@@ -303,7 +328,7 @@ def run():
                 return
         QtWidgets.QMessageBox.information(dialog, title, message)
     except Exception as exc:
-        App.Console.PrintError("OpenSpindle: %s\n" % exc)
+        App.Console.PrintError("OpenSpindle: " + traceback.format_exc())
         QtWidgets.QMessageBox.critical(None, title, str(exc))
 
 
