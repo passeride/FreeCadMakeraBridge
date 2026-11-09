@@ -12,9 +12,13 @@ This addon is not in the official FreeCAD catalog yet.
    it on main, which does not contain the addon until the PR is merged.
 4. Refresh the addon list, select **FreeCADMakeraBridge** and install it.
 5. Restart FreeCAD, activate **CAM**, and show the **Makera Bridge** toolbar if
-   you previously hid it. It contains one **Klargjør på Z1** button.
-6. Select your CAM Job and click the button. Choose the OpenSpindle executable
-   on the first run. Its path and export directory are remembered.
+   you previously hid it.
+6. Select the CAM Job for **Send jobb til OpenSpindle**. For **Send operasjon til
+   OpenSpindle**, select one active operation under the job. A configured
+   installation opens the export directly, without a FreeCAD dialog.
+7. Set the executable path and export folder in **Edit → Preferences →
+   Makera Bridge → OpenSpindle**. If the executable is unset or unavailable,
+   the send button offers to locate it, open the download page or export the file.
 
 There is no additional workbench to select. The addon contributes a small
 CAM-only toolbar using FreeCAD's workbench-manipulator API, available since 1.0.
@@ -34,7 +38,7 @@ previous installation still reports a missing `FreeCAD_SendToOpenSpindle.FCMacro
 or `freecad.makera_bridge.handoff`, update to the latest version and restart FreeCAD.
 If the update does not appear, reinstall the addon from the configured branch. Use the
 CAM toolbar button after restarting. Addon Manager may copy a launcher macro
-to a different FreeCAD Macro directory. The toolbar loads the Python dialog
+to a different FreeCAD Macro directory. The toolbar loads the Python command
 from `commands.py` in its own addon package. The current launcher also works with the installed
 addon when it is copied by itself. Preferences
 and exported jobs live outside the addon checkout. Do not use the standalone

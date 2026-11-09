@@ -1,4 +1,4 @@
-"""Contribute one command to CAM, without registering another workbench."""
+"""Contribute OpenSpindle commands to the CAM workbench."""
 import FreeCADGui as Gui
 from .commands import register
 
@@ -19,6 +19,7 @@ class CAMToolbar:
         return [
             {'append': 'Makera Bridge', 'toolBar': ''},
             {'append': 'MakeraBridge_Prepare', 'toolBar': 'Makera Bridge'},
+            {'append': 'MakeraBridge_SendOperation', 'toolBar': 'Makera Bridge'},
         ]
 
 

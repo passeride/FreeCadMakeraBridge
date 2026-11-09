@@ -7,6 +7,23 @@ from freecad.makera_bridge.commands import postprocess
 
 
 class PostprocessTests(unittest.TestCase):
+    def test_only_selected_operations_are_passed_to_the_freecad_post(self):
+        job = types.SimpleNamespace(Machine='Z1')
+        operation = object()
+        post = Mock(spec=['export2'])
+        post.export2.return_value = [('part.cnc', 'G1 X1')]
+        processor = Mock()
+        processor.PostProcessorFactory.get_post_processor.return_value = post
+        machines = Mock()
+        machines.MachineFactory.get_machine.return_value.postprocessor_file_name = 'makera_z1_named'
+        with patch.dict(sys.modules, {'Path.Post.Processor': processor, 'Machine.models.machine': machines}):
+            self.assertEqual(postprocess(job, [operation]), ('G1 X1', 'makera_z1_named'))
+            with self.assertRaises(ValueError):
+                postprocess(job, [])
+        processor.PostProcessorFactory.get_post_processor.assert_called_once_with(
+            {'job': job, 'operations': [operation]}, 'makera_z1_named'
+        )
+
     def test_makera_post_uses_configured_minimum_when_toolhead_omits_it(self):
         # FreeCAD's bundle merge leaves MIN_SPINDLE_SPEED unset when a toolhead
         # has no minimum. The Makera post compares an S word against that value.

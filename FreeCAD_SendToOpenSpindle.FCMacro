@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Open the installed addon's dialog or the standalone installer's private copy."""
+"""Send a CAM job using the addon or the standalone installer's private copy."""
 import importlib.util
 from pathlib import Path
 import sys
@@ -17,7 +17,7 @@ def run():
         except ImportError:
             message = (
                 "Installer eller oppdater FreeCADMakeraBridge i Addon Manager og "
-                "bruk Klargjør på Z1 i CAM. For separat makroinstallasjon, "
+                "bruk Send jobb til OpenSpindle i CAM. For separat makroinstallasjon, "
                 "pakk ut hele ZIP-filen og kjør installasjonsmakroen."
             )
             App.Console.PrintError(message + "\n")

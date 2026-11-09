@@ -14,6 +14,7 @@ import traceback
 import uuid
 
 MAX_BYTES = 10 * 1024 * 1024
+PREFERENCES_PATH = "User parameter:BaseApp/Preferences/Macro/SendToOpenSpindle"
 
 
 def validate_nc(gcode):
@@ -31,11 +32,13 @@ def validate_nc(gcode):
 
 def export_label(source):
     job = source["job_label"].strip()
-    if job and not re.fullmatch(r"Job(?:\s*\(?\d+\)?)?", job, re.I):
-        return job
     document = source.get("document_label", "").strip()
     operations = source.get("operations", [])
     operation = operations[0]["label"].strip() if len(operations) == 1 else ""
+    if source.get("scope") == "operation" and operation:
+        return operation
+    if job and not re.fullmatch(r"Job(?:\s*\(?\d+\)?)?", job, re.I):
+        return job
     if document and operation and document.casefold() != operation.casefold():
         return f"{document} - {operation}"
     return document or operation or "CAM"
@@ -215,25 +218,23 @@ def source_metadata(job, postprocessor, freecad_version, operations):
     }
 
 
-def get_job():
-    import FreeCAD as App
-    import FreeCADGui as Gui
-    doc = App.ActiveDocument
-    if not doc:
-        raise RuntimeError("Åpne et dokument med CAM-jobb først.")
-    selected = Gui.Selection.getSelection()
-    if selected:
-        obj = selected[0]
-        if hasattr(obj, "Operations") and hasattr(obj, "Machine"):
-            return obj
-        try:
-            from PathScripts.PathUtils import findParentJob
-            job = findParentJob(obj)
-            if job:
-                return job
-        except (ImportError, AttributeError):
-            pass
-    jobs = [o for o in doc.Objects if hasattr(o, "Operations") and hasattr(o, "Machine")]
+def cam_jobs(doc):
+    return [obj for obj in doc.Objects if hasattr(obj, "Operations") and hasattr(obj, "Machine")]
+
+
+def operation_owner(jobs, operation):
+    return next((job for job in jobs if operation in job.Operations.Group), None)
+
+
+def get_job(doc, selection):
+    jobs = cam_jobs(doc)
+    if selection:
+        selected = selection[0]
+        if selected in jobs:
+            return selected
+        owner = operation_owner(jobs, selected)
+        if owner is not None:
+            return owner
     if len(jobs) == 1:
         return jobs[0]
     if not jobs:
@@ -241,7 +242,17 @@ def get_job():
     raise RuntimeError("Velg riktig CAM-jobb i modelltreet (flere jobber funnet).")
 
 
-def postprocess(job):
+def selected_operation(doc, selection, is_active):
+    if doc is None or len(selection) != 1:
+        return None
+    operation = selection[0]
+    job = operation_owner(cam_jobs(doc), operation)
+    if job is None or not is_active(operation):
+        return None
+    return job, operation
+
+
+def postprocess(job, operations=None):
     from Path.Post.Processor import PostProcessorFactory
     from Machine.models.machine import MachineFactory
     machine = MachineFactory.get_machine(job.Machine)
@@ -252,7 +263,12 @@ def postprocess(job):
         raise RuntimeError("CAM Machine mangler valgt postprosessor.")
     if not any(s in name.lower() for s in ("makera", "z1", "carvera")):
         raise RuntimeError("Postprosessoren '%s' ser ikke ut som en Makera-postprosessor." % name)
-    post = PostProcessorFactory.get_post_processor(job, name)
+    if operations is not None and not operations:
+        raise ValueError("Ingen CAM-operasjon er valgt for eksport.")
+    # The same filtered job argument FreeCAD uses for Post Selected. An empty
+    # selection would make its post fall back to the entire job.
+    job_arg = job if operations is None else {"job": job, "operations": operations}
+    post = PostProcessorFactory.get_post_processor(job_arg, name)
     if post is None or not hasattr(post, "export2"):
         raise RuntimeError("Machine-postprosessoren '%s' er ikke tilgjengelig." % name)
     # The unified FreeCAD dialog applies the bundle before export2. The base
@@ -291,105 +307,154 @@ def postprocess(job):
     return gcode, name
 
 
-def run():
+def preferences():
     import FreeCAD as App
-    from PySide import QtWidgets, QtCore, QtGui
-    title = "Klargjør på Z1 · OpenSpindle"
+    return App.ParamGet(PREFERENCES_PATH)
+
+
+def default_export_folder():
+    return str(Path.home() / "Documents" / "FreeCAD-OpenSpindle")
+
+
+def browse_receiver(parent):
+    from PySide import QtWidgets
+    if sys.platform == "darwin":
+        return QtWidgets.QFileDialog.getExistingDirectory(parent, "Velg OpenSpindle.app")
+    path, _ = QtWidgets.QFileDialog.getOpenFileName(parent, "Velg OpenSpindle-programfil")
+    return path
+
+
+def resolve_receiver(executable, parent):
+    from PySide import QtCore, QtGui, QtWidgets
+
+    def decide(reason):
+        prompt = QtWidgets.QMessageBox(parent)
+        prompt.setWindowTitle("OpenSpindle er ikke tilgjengelig")
+        prompt.setText(reason)
+        prompt.setInformativeText("Finn installasjonen, åpne nedlastingssiden eller lagre bare NC-filen.")
+        find = prompt.addButton("Finn OpenSpindle…", QtWidgets.QMessageBox.ActionRole)
+        download = prompt.addButton("Åpne nedlastingsside", QtWidgets.QMessageBox.ActionRole)
+        export = prompt.addButton("Eksporter bare fil", QtWidgets.QMessageBox.AcceptRole)
+        prompt.addButton(QtWidgets.QMessageBox.Cancel)
+        prompt.exec_()
+        return {find: "find", download: "download", export: "export"}.get(
+            prompt.clickedButton(), "cancel"
+        )
+
+    def download(url):
+        if not QtGui.QDesktopServices.openUrl(QtCore.QUrl(url)):
+            QtWidgets.QMessageBox.warning(parent, "OpenSpindle", "Kunne ikke åpne " + url)
+
+    return configure_receiver(
+        executable, True, decide, lambda: discover_receiver() or browse_receiver(parent), download
+    )
+
+
+def run(operation_only=False):
+    import FreeCAD as App
+    import FreeCADGui as Gui
+    from PySide import QtCore, QtGui, QtWidgets
+
+    title = "Send operasjon til OpenSpindle" if operation_only else "Send jobb til OpenSpindle"
+    parent = Gui.getMainWindow()
     try:
         from Path.Base import Util as PathUtil
-        job = get_job()
-        prefs = App.ParamGet("User parameter:BaseApp/Preferences/Macro/SendToOpenSpindle")
-        dialog = QtWidgets.QDialog()
-        dialog.setWindowTitle(title)
-        layout = QtWidgets.QFormLayout(dialog)
-        layout.addRow("CAM-jobb:", QtWidgets.QLabel(job.Label))
-        executable = QtWidgets.QLineEdit(prefs.GetString("Executable", ""))
-        browse = QtWidgets.QPushButton("Finn installasjon…")
-        def choose():
-            detected = discover_receiver()
-            if detected:
-                executable.setText(detected)
-                return detected
-            if sys.platform == 'darwin':
-                path = QtWidgets.QFileDialog.getExistingDirectory(dialog, "Velg OpenSpindle.app")
-            else:
-                path, _ = QtWidgets.QFileDialog.getOpenFileName(dialog, "Velg OpenSpindle-programfil")
-            if path:
-                executable.setText(path)
-            return path
-        browse.clicked.connect(choose)
-        app_row = QtWidgets.QHBoxLayout()
-        app_row.addWidget(executable)
-        app_row.addWidget(browse)
-        layout.addRow("OpenSpindle:", app_row)
-        folder = QtWidgets.QLineEdit(prefs.GetString("Exports", str(Path.home() / "Documents" / "FreeCAD-OpenSpindle")))
-        layout.addRow("Eksportmappe:", folder)
-        opening = QtWidgets.QCheckBox("Åpne eksporten i OpenSpindle")
-        opening.setChecked(True)
-        layout.addRow(opening)
-        note = QtWidgets.QLabel("G-koden åpnes for kontroll. Oppsett, nullpunkt og verktøy må bekreftes i OpenSpindle.\n"
-                               "Import og maskinoverføring bekreftes ikke av denne makroen.\n"
-                               "En kilde-ID lagres som egenskap på CAM-jobben; lagre dokumentet for å beholde den.")
-        note.setWordWrap(True)
-        layout.addRow(note)
-        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
-        buttons.button(QtWidgets.QDialogButtonBox.Ok).setText("Klargjør på Z1")
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addRow(buttons)
-        if dialog.exec_() != QtWidgets.QDialog.Accepted:
-            return
-        if not folder.text().strip():
-            raise ValueError("Velg en eksportmappe.")
-        def decide(reason):
-            prompt = QtWidgets.QMessageBox(dialog)
-            prompt.setWindowTitle("OpenSpindle er ikke tilgjengelig")
-            prompt.setText(reason)
-            prompt.setInformativeText("Finn programmet, åpne den offisielle nedlastingssiden eller eksporter bare fil. "
-                                      "Nedlastingssiden installerer ikke programmet automatisk."
-                                      + (" På Linux finnes det foreløpig ingen offisiell installasjonspakke." if sys.platform.startswith("linux") else ""))
-            find_button = prompt.addButton("Finn installasjon", QtWidgets.QMessageBox.ActionRole)
-            download_button = prompt.addButton("Åpne nedlastingsside", QtWidgets.QMessageBox.ActionRole)
-            export_button = prompt.addButton("Eksporter bare fil", QtWidgets.QMessageBox.AcceptRole)
-            prompt.addButton(QtWidgets.QMessageBox.Cancel)
-            prompt.exec_()
-            return {find_button: 'find', download_button: 'download', export_button: 'export'}.get(prompt.clickedButton(), 'cancel')
-        def download(url):
-            if not QtGui.QDesktopServices.openUrl(QtCore.QUrl(url)):
-                QtWidgets.QMessageBox.warning(dialog, title, "Kunne ikke åpne nettleseren. Åpne: " + url)
-        receiver = configure_receiver(executable.text().strip(), opening.isChecked(), decide, choose, download)
+        doc = App.ActiveDocument
+        if doc is None:
+            raise RuntimeError("Åpne et dokument med CAM-jobb først.")
+        selection = Gui.Selection.getSelection()
+        operation = None
+        if operation_only:
+            selected = selected_operation(doc, selection, PathUtil.activeForOp)
+            if selected is None:
+                raise RuntimeError("Velg én aktiv operasjon under CAM-jobben.")
+            job, operation = selected
+        else:
+            job = get_job(doc, selection)
+
+        prefs = preferences()
+        saved_executable = prefs.GetString("Executable", "").strip()
+        receiver = resolve_receiver(saved_executable, parent)
         if receiver is None:
             return
-        app_path, should_open = receiver
-        executable.setText(app_path)
-        check_job(job)
-        gcode, post = postprocess(job)
+        executable, should_open = receiver
+        if should_open and executable != saved_executable:
+            prefs.SetString("Executable", executable)
+        folder = prefs.GetString("Exports", "").strip() or default_export_folder()
+
         check_job(job)
         operations = [op for op in job.Operations.Group if PathUtil.activeForOp(op)]
+        if operation_only:
+            if operation not in operations:
+                raise RuntimeError("Den valgte operasjonen er ikke lenger aktiv i CAM-jobben.")
+            operations = [operation]
+        gcode, post = postprocess(job, operations) if operation_only else postprocess(job)
+        check_job(job)
         source = source_metadata(job, post, App.Version(), operations)
+        source["scope"] = "operation" if operation_only else "job"
         controllers = (PathUtil.toolControllerForOp(op) for op in operations)
-        path, manifest = publish(folder.text().strip(), with_tool_comments(gcode, controllers), source)
-        prefs.SetString("Executable", executable.text().strip())
-        prefs.SetString("Exports", folder.text().strip())
-        message = "Eksportert lokalt: %s\nRevisjon: %s" % (path, manifest["program"]["sha256"][:12])
+        path, _ = publish(folder, with_tool_comments(gcode, controllers), source)
         if should_open:
             try:
-                launch(executable.text().strip(), path)
-                message += "\nÅpning forespurt. Kontroller importen i OpenSpindle."
-            except Exception as exc:
-                QtWidgets.QMessageBox.warning(dialog, title, message + "\nKunne ikke åpne OpenSpindle: %s\nÅpne .nc-filen manuelt." % exc)
-                return
-        QtWidgets.QMessageBox.information(dialog, title, message)
+                launch(executable, path)
+            except (OSError, ValueError) as exc:
+                raise RuntimeError(f"Kunne ikke åpne OpenSpindle: {exc}\nÅpne filen manuelt: {path}") from exc
+        elif not QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(path.parent))):
+            QtWidgets.QMessageBox.warning(parent, title, f"Filen er lagret her: {path}")
     except Exception as exc:
         App.Console.PrintError("OpenSpindle: " + traceback.format_exc())
-        QtWidgets.QMessageBox.critical(None, title, str(exc))
+        QtWidgets.QMessageBox.critical(parent, title, str(exc))
+
+
+class OpenSpindlePreferences:
+    def __init__(self, parent=None):
+        from PySide import QtWidgets
+        self.form = QtWidgets.QWidget(parent)
+        self.form.setWindowTitle("OpenSpindle")
+        layout = QtWidgets.QFormLayout(self.form)
+        self.executable = QtWidgets.QLineEdit()
+        self.folder = QtWidgets.QLineEdit()
+        for label, field, pick in (
+            ("OpenSpindle-program", self.executable, lambda: browse_receiver(self.form)),
+            ("Eksportmappe", self.folder, lambda: QtWidgets.QFileDialog.getExistingDirectory(
+                self.form, "Velg eksportmappe", self.folder.text()
+            )),
+        ):
+            row = QtWidgets.QHBoxLayout()
+            button = QtWidgets.QPushButton("Bla gjennom…")
+            button.clicked.connect(lambda checked=False, edit=field, choose=pick: self.browse(edit, choose))
+            row.addWidget(field)
+            row.addWidget(button)
+            layout.addRow(label, row)
+
+    @staticmethod
+    def browse(field, choose):
+        path = choose()
+        if path:
+            field.setText(path)
+
+    def loadSettings(self):
+        prefs = preferences()
+        self.executable.setText(prefs.GetString("Executable", ""))
+        self.folder.setText(prefs.GetString("Exports", "") or default_export_folder())
+
+    def saveSettings(self):
+        prefs = preferences()
+        prefs.SetString("Executable", self.executable.text().strip())
+        prefs.SetString("Exports", self.folder.text().strip())
+
+
+def command_icon(name):
+    resources = Path(__file__).parent / "resources"
+    icon = resources / name
+    return str(icon if icon.is_file() else resources / "bridge.svg")
 
 
 class PrepareCommand:
     def GetResources(self):
-        return {'Pixmap': str(Path(__file__).parent/'resources'/'bridge.svg'),
-                'MenuText': 'Klargjør på Z1',
-                'ToolTip': 'Eksporter en CAM Machine-jobb og åpne den i OpenSpindle'}
+        return {"Pixmap": command_icon("send-job.svg"),
+                "MenuText": "Send jobb til OpenSpindle",
+                "ToolTip": "Eksporter hele CAM-jobben og åpne den i OpenSpindle"}
 
     def IsActive(self):
         import FreeCAD as App
@@ -399,6 +464,26 @@ class PrepareCommand:
         run()
 
 
+class SendOperationCommand:
+    def GetResources(self):
+        return {"Pixmap": command_icon("send-operation.svg"),
+                "MenuText": "Send operasjon til OpenSpindle",
+                "ToolTip": "Eksporter én valgt, aktiv CAM-operasjon og åpne den i OpenSpindle"}
+
+    def IsActive(self):
+        import FreeCAD as App
+        import FreeCADGui as Gui
+        if App.ActiveDocument is None:
+            return False
+        from Path.Base import Util as PathUtil
+        return selected_operation(App.ActiveDocument, Gui.Selection.getSelection(), PathUtil.activeForOp) is not None
+
+    def Activated(self):
+        run(operation_only=True)
+
+
 def register():
     import FreeCADGui as Gui
-    Gui.addCommand('MakeraBridge_Prepare', PrepareCommand())
+    Gui.addCommand("MakeraBridge_Prepare", PrepareCommand())
+    Gui.addCommand("MakeraBridge_SendOperation", SendOperationCommand())
+    Gui.addPreferencePage(OpenSpindlePreferences, "Makera Bridge")

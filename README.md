@@ -29,8 +29,11 @@ Review G-code, work offsets, tool clearance, and Scan Machining Area before manu
 
 This PR includes a namespaced CAM extension and package.xml.
 Install through Addon Manager using this repository as a custom repository on
-branch `feat/openspindle-handoff`, then restart FreeCAD and activate **CAM**. The **Makera Bridge** toolbar contains
-one **Klargjør på Z1** button; no additional workbench is registered.
+branch `feat/openspindle-handoff`, then restart FreeCAD and activate **CAM**.
+Use **Send jobb til OpenSpindle** on the **Makera Bridge** toolbar, or select
+one active CAM operation and click **Send operasjon til OpenSpindle**.
+Both open the export directly. Set the program path and export folder under
+**Edit → Preferences → Makera Bridge → OpenSpindle**.
 Updates are managed by Addon Manager. See [addon installation and official
 publication requirements](docs/addon-manager.md). This is not yet listed in the
 official catalog and still needs real FreeCAD GUI validation. MIT licensing is
@@ -53,9 +56,10 @@ retained. **Gå tilbake til forrige versjon** restores it. Exported jobs and Fre
 preferences (OpenSpindle path and export directory) are kept. No network updater
 runs inside FreeCAD. See [installation and updates](docs/installation.md).
 
-Select your CAM Job and run `Klargjor_pa_Z1`. Choose the OpenSpindle executable
-using **Velg program…**, then **Klargjør på Z1**. On macOS enter the full `.app`
-bundle path in the field. Untick opening to export only. The paths are remembered.
+Select your CAM Job and run `Klargjor_pa_Z1`. If OpenSpindle is unconfigured
+or missing, use **Finn OpenSpindle…** to locate it, or choose
+**Eksporter bare fil** to open the export folder instead. On macOS select the
+`.app` bundle. The selected executable path is remembered.
 
 Requires FreeCAD's Machine-based CAM `export2` API and a configured Makera
 postprocessor. Legacy FreeCAD 1.1 jobs are not supported by this macro.
@@ -64,8 +68,9 @@ time main supported Windows, but release v0.3.0 had macOS assets only; use a
 compatible build rather than assuming every published version has this support.
 
 The macro recomputes and blocks objects still marked invalid/error/touched,
-exports one complete program (at most 10 MiB), and stores the original post
-output with a bridge-owned `handoff.json` in a unique snapshot directory.
+exports one complete program (at most 10 MiB), and stores the post output
+with a bridge-owned `handoff.json` in a unique snapshot directory.
+The bridge adds tool comments when the post supplies none.
 A persistent source ID is added to the CAM Job; save the FreeCAD document to
 retain it. A copied Job receives a new ID when a duplicate is detected.
 The full NC SHA-256 is the **program revision**, not a revision of stock,
@@ -74,9 +79,8 @@ The manifest records source identity, operation names, postprocessor name and
 FreeCAD version. It is local traceability metadata; OpenSpindle does not consume
 this sidecar or acknowledge it. The executable is launched without a shell.
 
-If opening fails the export remains available for manual import. A successful
-launch means only **Åpning forespurt**, never imported, uploaded, verified, or
-running. Check tools, stock and work origin in OpenSpindle. Geometry/fixtures,
+If opening fails FreeCAD shows where to find the export for manual import.
+Check tools, stock and work origin in OpenSpindle. Geometry/fixtures,
 stock markers, tool-library synchronization and update-in-place are not
 implemented. No work offsets are sent and no machine connection is opened.
 There is no automatic machining start.

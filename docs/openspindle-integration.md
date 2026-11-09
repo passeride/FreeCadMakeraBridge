@@ -7,7 +7,7 @@ and remain a prerequisite for using that receiver; this new path bypasses it.
 
 | Design capability | Status |
 |---|---|
-| One command to export and request opening | Implemented: new FreeCAD macro |
+| Direct handoff from CAM | Send a job or one selected operation from the toolbar |
 | Recompute/error gate | Implemented, conservative document-wide gate |
 | Immutable export, source ID, program hash, local operation metadata | Implemented |
 | OS-level open without shell interpolation | Implemented; mocked Windows/macOS tests |
@@ -22,12 +22,15 @@ and remain a prerequisite for using that receiver; this new path bypasses it.
 
 ## Manual acceptance before using on a machine
 
-1. Install via Addon Manager or the complete standalone ZIP. Restart FreeCAD,
-   select CAM, and click **Klargjør på Z1** on the Makera Bridge toolbar.
+1. Install via Addon Manager and restart FreeCAD. Select CAM and use **Send jobb
+   til OpenSpindle** on the Makera Bridge toolbar. The standalone macro also
+   sends the full job.
 2. Use a Machine-based CAM Job with the intended Makera post. Include profile
    tabs, a pocket, drilling and multiple tools in representative test jobs.
-3. Run the new macro with opening disabled. Compare the executable NC blocks
-   against the normal post export, including tabs and tool changes. Inspect
+3. Compare the exported NC blocks with the normal post export, including tabs
+   and tool changes. Then select one active operation and use **Send operasjon
+   til OpenSpindle**. Compare it with FreeCAD's **Post Selected** for the same
+   operation and verify that the other operations are absent. Inspect
    handoff.json and verify the byte count and SHA-256. The source ID property
    makes the document modified.
 4. Export the same job twice: distinct folders, identical program hash. Modify
@@ -36,14 +39,15 @@ and remain a prerequisite for using that receiver; this new path bypasses it.
    running instance on Windows. On macOS enter the .app path. Import must show
    the intended file. A custom CAM job label names the file. For a default Job
    label the file uses the document name and, for a single active operation,
-   its label. The macro reports when it has requested opening the file.
+   its label. Sending one operation uses that operation's label. A normal send
+   opens the export directly, without a FreeCAD confirmation dialog.
 6. Try a missing executable before export: Find installation, Open download page,
    Export only and Cancel must be offered. Cancel (or closing the prompt) must
    create no export/source property. Download opens the official page only and
    returns to the choice; it must not imply installation. Canceling the file
-   picker also returns to the choice. Export only must produce an NC snapshot
-   without trying to start OpenSpindle. Also test a launch failure after export:
-   the saved path remains available for manual import.
+   picker also returns to the choice. Export only opens the NC snapshot folder.
+   Test a launch failure after export and check that the error includes the
+   saved path for manual import.
 7. In OpenSpindle check stock, work origin, tool assignment and the exact NC.
    Unknown or omitted movements in a preview must be investigated. Do not infer
    validation of machine geometry from the local manifest's existence.
