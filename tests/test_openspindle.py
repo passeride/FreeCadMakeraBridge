@@ -19,7 +19,7 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(bridge.export_label({**source, 'job_label': 'Finish pass'}), 'Finish pass')
 
     def test_tool_comments_keep_native_markers_and_motion_bytes(self):
-        tool = SimpleNamespace(Label='V-bit (90°)', ShapeType='VBit',
+        tool = SimpleNamespace(Label='Chamfer bit 90° × 0.1 mm tip', ShapeType='VBit',
                                Diameter=SimpleNamespace(Value=3.175), TipDiameter=0.1,
                                CuttingEdgeAngle=90)
         controller = SimpleNamespace(Tool=tool, ToolNumber=2)
@@ -27,6 +27,7 @@ class HandoffTests(unittest.TestCase):
         marked = bridge.with_tool_comments(code, [controller, controller])
         self.assertEqual(marked.count('@FC|TOOL|'), 1)
         self.assertIn('number=2|unit=mm|type=VBit', marked)
+        self.assertIn('name=Chamfer bit 90° × 0.1 mm tip', marked)
         self.assertIn('diameter=3.175|tipdiameter=0.1|cuttingedgeangle=90', marked)
         lines = marked.splitlines(keepends=True)
         self.assertEqual(lines[0] + ''.join(lines[2:]), code)

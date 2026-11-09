@@ -172,7 +172,7 @@ def with_tool_comments(gcode, controllers):
         # These are FreeCAD's internal units. They do not depend on G20/G21.
         shape = re.sub(r"[^a-zA-Z0-9_-]", "", str(getattr(tool, "ShapeType", "")))
         fields = [f"number={number}", "unit=mm", f"type={shape or 'unknown'}"]
-        name = re.sub(r"[^ -~]|[()|;]", " ", str(tool.Label))[:120].strip()
+        name = re.sub(r"[\x00-\x1f\x7f()|;]", " ", str(tool.Label))[:120].strip()
         if name:
             fields.append(f"name={name}")
         for key, properties in (("diameter", ("Diameter",)), ("tipdiameter", ("TipDiameter",)),
