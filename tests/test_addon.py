@@ -1,5 +1,6 @@
 import importlib
 import importlib.util
+import json
 import runpy
 import tempfile
 from pathlib import Path
@@ -22,6 +23,13 @@ class AddonTests(unittest.TestCase):
         self.assertIsNone(tree.find('p:content/p:workbench', ns))
         self.assertTrue((root/tree.find('p:icon', ns).text).is_file())
         self.assertTrue((root/tree.find('p:license', ns).attrib['file']).is_file())
+        machines = root / tree.find('p:content/p:machine/p:subdirectory', ns).text
+        posts = root / tree.find('p:content/p:postprocessor/p:subdirectory', ns).text
+        profile = json.loads((machines / 'Makera_Z1_Bridge.fcm').read_text())
+        template = json.loads((root / 'freecad/makera_bridge/resources/job_Makera_Z1.json').read_text())
+        self.assertEqual(template['Machine'], profile['machine']['name'])
+        self.assertEqual(set(profile['machine']['axes']), {'X', 'Y', 'Z'})
+        self.assertTrue((posts / (profile['postprocessor']['file_name'] + '_post.py')).is_file())
 
     def test_toolbar_is_scoped_to_cam_without_extra_workbench(self):
         gui = types.ModuleType('FreeCADGui')
@@ -38,13 +46,17 @@ class AddonTests(unittest.TestCase):
             module = importlib.import_module(name)
             gui.addWorkbench.assert_not_called()
             self.assertEqual([call.args[0] for call in gui.addCommand.call_args_list],
-                             ['MakeraBridge_Prepare', 'MakeraBridge_SendOperation'])
+                             ['MakeraBridge_Prepare', 'MakeraBridge_SendOperation', 'MakeraBridge_NewZ1Job'])
             for call in gui.addCommand.call_args_list:
-                icon = Path(call.args[1].GetResources()['Pixmap'])
-                self.assertTrue(icon.is_file())
+                icon = call.args[1].GetResources()['Pixmap']
+                if call.args[0] == 'MakeraBridge_NewZ1Job':
+                    self.assertEqual(icon, 'CAM_Job')
+                else:
+                    self.assertTrue(Path(icon).is_file())
             gui.addPreferencePage.assert_called_once_with(commands.OpenSpindlePreferences, 'Makera Bridge')
             gui.addWorkbenchManipulator.assert_called_once_with(module.manipulator)
             expected = [{'append': 'Makera Bridge', 'toolBar': ''},
+                        {'append': 'MakeraBridge_NewZ1Job', 'toolBar': 'Makera Bridge'},
                         {'append': 'MakeraBridge_Prepare', 'toolBar': 'Makera Bridge'},
                         {'append': 'MakeraBridge_SendOperation', 'toolBar': 'Makera Bridge'}]
             self.assertEqual(module.manipulator.modifyToolBars(), expected)
@@ -56,6 +68,23 @@ class AddonTests(unittest.TestCase):
             self.assertEqual(module.manipulator.modifyToolBars(), expected)
             gui.activeWorkbench.return_value = None
             self.assertEqual(module.manipulator.modifyToolBars(), [])
+
+    def test_new_z1_job_uses_native_model_picker_and_bundled_template(self):
+        gui = Mock()
+        dialog = Mock()
+        dialog.getModels.return_value = [types.SimpleNamespace(Name='Body')]
+        cam = types.SimpleNamespace(Job=Mock(), JobDlg=Mock())
+        cam.JobDlg.JobCreate.return_value = dialog
+        with patch.dict(sys.modules, {'FreeCADGui': gui, 'Path.Main.Gui': cam}):
+            module = importlib.import_module('freecad.makera_bridge.init_gui')
+            dialog.exec_.return_value = 0
+            module.NewZ1JobCommand().Activated()
+            cam.Job.Create.assert_not_called()
+            dialog.exec_.return_value = 1
+            module.NewZ1JobCommand().Activated()
+            models, template = cam.Job.Create.call_args.args
+            self.assertEqual(models, ['Body'])
+            self.assertEqual(json.loads(Path(template).read_text())['Machine'], 'Makera Z1 3-axis - Makera Bridge')
 
     def test_command_runs_from_the_installed_module(self):
         from freecad.makera_bridge.commands import PrepareCommand

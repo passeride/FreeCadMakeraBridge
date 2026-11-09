@@ -99,3 +99,12 @@ class PostprocessTests(unittest.TestCase):
         self.assertIn("G53 G0 Z-3\r\nM400\r\nG00 X20 Y30 Z3", result)
         self.assertTrue(result.endswith("G53 G0 Z-3\r\nM400\r\nG0 Z4\r\nG0 X21 Y31"))
         self.assertEqual(z1_clearance_retract(result), result)
+
+    def test_bundled_post_keeps_xy_at_machine_clearance(self):
+        source = "G21 G90\nM6 T2\nM3 S12000\nG0 Z3.000\nG0 X59.059 Y90.653 Z3.000\nG1 Z-1.850\n"
+        expected = (
+            "G21 G90\nM6 T2\nM3 S12000\nG53 G0 Z-3\nM400\nG0 X59.059 Y90.653\n"
+            "M400\nG0 Z3.000\nG1 Z-1.850\n"
+        )
+        self.assertEqual(z1_clearance_retract(source, high_traverse=True), expected)
+        self.assertEqual(z1_clearance_retract(expected, high_traverse=True), expected)

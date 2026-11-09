@@ -265,8 +265,8 @@ _Z1_APPROACH_XY = re.compile(
 )
 
 
-def z1_clearance_retract(gcode):
-    """Insert the Z1 machine clearance before each post tool approach."""
+def z1_clearance_retract(gcode, *, high_traverse=False):
+    """Retract before a recognized approach, optionally keeping XY at clearance."""
     lines = gcode.splitlines(keepends=True)
     blocks = [re.sub(r"\([^)]*\)|;[^\r\n]*", "", line).strip().upper() for line in lines]
     if any(re.search(r"[ABC]\s*[+\-\d.]", block) for block in blocks):
@@ -297,13 +297,27 @@ def z1_clearance_retract(gcode):
             )
             if xy_index == len(blocks):
                 continue
-        if not _Z1_APPROACH_XY.fullmatch(lines[xy_index].strip().upper()):
+        xy = _Z1_APPROACH_XY.fullmatch(lines[xy_index].strip().upper())
+        if not xy:
             continue
 
         newline = "\r\n" if lines[index].endswith("\r\n") else "\n"
         retract = newline.join(("G53 G0 Z-3", "M400", ""))
-        lines.insert(index, retract)
-        blocks.insert(index, "G53 G0 Z-3")
+        z = xy["z"]
+        if first_z and z is None:
+            z = first_z["z"]
+        if not high_traverse or z is None or (first_z and float(first_z["z"]) != float(z)):
+            lines[index] = retract + lines[index]
+            continue
+
+        traverse = newline.join((f'G0 X{xy["x"]} Y{xy["y"]}', "M400", f"G0 Z{z}"))
+        if lines[xy_index].endswith(("\r", "\n")):
+            traverse += newline
+        if first_z:
+            lines[index] = retract
+            lines[xy_index] = traverse
+        else:
+            lines[index] = retract + traverse
     return "".join(lines)
 
 

@@ -25,19 +25,18 @@ Status files: `.request.json` pending, `.processing.json` claimed, `.done.json` 
 
 Review G-code, work offsets, tool clearance, and Scan Machining Area before manually starting the machine.
 
-## Addon Manager (experimental)
+## Addon Manager
 
-This PR includes a namespaced CAM extension and package.xml.
-Install through Addon Manager using this repository as a custom repository on
-branch `feat/openspindle-handoff`, then restart FreeCAD and activate **CAM**.
-Use **Send jobb til OpenSpindle** on the **Makera Bridge** toolbar, or select
-one active CAM operation and click **Send operasjon til OpenSpindle**.
-Both open the export directly. Set the program path and export folder under
-**Edit → Preferences → Makera Bridge → OpenSpindle**.
-Updates are managed by Addon Manager. See [addon installation and official
-publication requirements](docs/addon-manager.md). This is not yet listed in the
-official catalog and still needs real FreeCAD GUI validation. MIT licensing is
-proposed by this PR. The standalone macro installer below remains an alternative.
+Add this repository as a custom repository in **Tools → Addon Manager**.
+Install or update **FreeCADMakeraBridge** from the default branch and restart
+FreeCAD 26.3 or later. In CAM, use **Ny Z1-jobb** to open the normal model picker
+with the bundled three-axis Makera Z1 machine and its post already selected.
+
+Set up the stock, work origin and tool in FreeCAD. Use **Send jobb til
+OpenSpindle** or select an active operation and use **Send operasjon til
+OpenSpindle**. OpenSpindle is installed separately and can be located the
+first time you send a job. The bundled post also works with FreeCAD's normal
+**Post** command. See the [installation and upgrade guide](docs/addon-manager.md).
 
 ## OpenSpindle: Klargjør på Z1
 

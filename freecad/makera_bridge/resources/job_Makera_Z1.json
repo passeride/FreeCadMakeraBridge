@@ -1,0 +1,7 @@
+{
+  "Version": 1,
+  "Desc": "Makera Z1 three-axis milling with the Makera Bridge postprocessor.",
+  "Machine": "Makera Z1 3-axis - Makera Bridge",
+  "Output": "%d/%j.cnc",
+  "SplitOutput": false
+}

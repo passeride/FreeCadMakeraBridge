@@ -22,15 +22,22 @@ and remain a prerequisite for using that receiver; this new path bypasses it.
 
 ## Z1 approach after a tool change
 
-For `makera_z1_named` and `makera_z1`, the bridge inserts only the Z1's
-machine-coordinate clearance retract, `G53 G0 Z-3`, before the first approach
-after each tool change. It does not add machine-coordinate X/Y moves. Current
-OpenSpindle builds accept this explicit cutting retract and use it to verify
-that the following XY travel cannot pass through the tool setter.
+The bundled `makera_z1_bridge` post is used for **Ny Z1-jobb** and can also be
+selected through its Machine on an existing three-axis job. In absolute,
+metric three-axis output it separates a recognized first rapid approach
+after a tool change into a machine-coordinate move to Z-3, an XY move to the
+first point, and then a descent to the programmed work Z. M400 waits for
+the lift and XY moves to finish. The same sequence is exported by **Post**
+and by the OpenSpindle handoff. Use an OpenSpindle build with support for
+`G53 G0 Z-3` in cutting operations.
 
-FreeCAD's standard Post command still calls the installed postprocessor
-directly. The handoff does not start the machine. Check the clearance of the
-tool, clamps and workpiece in the actual setup.
+A combined XYZ rapid or a Z-only rapid followed by XY at the same height
+can be split this way. Other recognized approaches keep their programmed
+moves with a machine-clearance move inserted before them. Rotary programs
+and unrelated postprocessors retain their own output. The older
+`makera_z1_named` and `makera_z1` handoff paths retain their clearance
+retract and the original approach. Review the tool, clamps and workpiece
+in the actual setup before running.
 
 ## Manual acceptance before using on a machine
 
@@ -39,7 +46,7 @@ tool, clamps and workpiece in the actual setup.
    sends the full job.
 2. Use a Machine-based CAM Job with the intended Makera post. Include profile
    tabs, a pocket, drilling and multiple tools in representative test jobs.
-3. Compare the exported NC blocks with the normal post export, including tabs
+3. For the bundled Machine, compare the handed-off NC with the normal post export, including tabs
    and tool changes. Then select one active operation and use **Send operasjon
    til OpenSpindle**. Compare it with FreeCAD's **Post Selected** for the same
    operation and verify that the other operations are absent. Inspect
