@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock
-from freecad.makera_bridge import bridge
+from freecad.makera_bridge import commands as bridge
 
 
 class HandoffTests(unittest.TestCase):

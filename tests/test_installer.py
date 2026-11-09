@@ -32,18 +32,24 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual((self.target/'Mine.FCMacro').read_text(), 'mine')
 
     def test_update_preserves_rollback_to_legacy_flat_layout(self):
+        self.check_legacy_rollback('0.2.0', installer.LEGACY_FILES)
+
+    def test_update_preserves_rollback_to_legacy_package_layout(self):
+        self.check_legacy_rollback('0.2.1', installer.LEGACY_PACKAGE_FILES)
+
+    def check_legacy_rollback(self, version, files):
         import hashlib
 
-        version = '0.2.0'
         content = b'x = 1\n'
         digest = hashlib.sha256(version.encode() + b'\0')
-        for name in sorted(installer.LEGACY_FILES):
+        for name in sorted(files):
             digest.update(name.encode() + b'\0' + content + b'\0')
         legacy_id = digest.hexdigest()
         root = self.target / installer.ROOT
         legacy = root / 'versions' / legacy_id
         legacy.mkdir(parents=True)
-        for name in installer.LEGACY_FILES:
+        for name in files:
+            (legacy / name).parent.mkdir(parents=True, exist_ok=True)
             (legacy / name).write_bytes(content)
         (legacy / 'VERSION').write_text(version)
         installer.atomic_json(root / 'active.json', {

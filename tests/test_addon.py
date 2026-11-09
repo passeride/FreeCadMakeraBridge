@@ -1,4 +1,5 @@
 import importlib
+import importlib.util
 import runpy
 import tempfile
 from pathlib import Path
@@ -47,7 +48,7 @@ class AddonTests(unittest.TestCase):
             gui.activeWorkbench.return_value = None
             self.assertEqual(module.manipulator.modifyToolBars(), [])
 
-    def test_command_uses_bundled_macro_without_installer(self):
+    def test_command_runs_from_the_installed_module(self):
         from freecad.makera_bridge.commands import PrepareCommand
         app = types.ModuleType('FreeCAD'); app.ActiveDocument = None
         with patch.dict(sys.modules, {'FreeCAD': app}):
@@ -55,8 +56,20 @@ class AddonTests(unittest.TestCase):
             self.assertFalse(command.IsActive())
             app.ActiveDocument = object()
             self.assertTrue(command.IsActive())
-        with patch('freecad.makera_bridge.handoff.run') as run:
+        with patch('freecad.makera_bridge.commands.run') as run:
             command.Activated()
+            run.assert_called_once_with()
+
+    def test_cam_command_loads_when_only_commands_file_is_present(self):
+        source = Path(__file__).resolve().parents[1] / 'freecad' / 'makera_bridge' / 'commands.py'
+        with tempfile.TemporaryDirectory() as directory:
+            installed = Path(directory) / 'commands.py'
+            installed.write_bytes(source.read_bytes())
+            spec = importlib.util.spec_from_file_location('isolated_addon_command', installed)
+            command_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(command_module)
+            with patch.object(command_module, 'run') as run:
+                command_module.PrepareCommand().Activated()
             run.assert_called_once_with()
 
     def test_macro_copied_to_macro_directory_uses_installed_addon(self):
@@ -68,7 +81,7 @@ class AddonTests(unittest.TestCase):
             pyside = types.ModuleType('PySide')
             pyside.QtWidgets = Mock()
             with patch.dict(sys.modules, {'FreeCAD': app, 'PySide': pyside}), patch(
-                'freecad.makera_bridge.handoff.run'
+                'freecad.makera_bridge.commands.run'
             ) as run:
                 runpy.run_path(str(macro), run_name='__main__')
             run.assert_called_once_with()

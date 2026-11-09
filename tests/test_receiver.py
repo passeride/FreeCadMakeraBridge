@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
-from freecad.makera_bridge import bridge
+from freecad.makera_bridge import commands as bridge
 
 
 class ReceiverTests(unittest.TestCase):

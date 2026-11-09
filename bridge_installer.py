@@ -9,11 +9,14 @@ import tempfile
 
 LEGACY_FILES = ('FreeCAD_SendToCommunity.FCMacro', 'FreeCAD_SendToOpenSpindle.FCMacro',
                 'openspindle_bridge.py')
+LEGACY_PACKAGE_FILES = ('FreeCAD_SendToOpenSpindle.FCMacro',
+                        'freecad/makera_bridge/__init__.py',
+                        'freecad/makera_bridge/bridge.py',
+                        'freecad/makera_bridge/cam.py',
+                        'freecad/makera_bridge/handoff.py')
 FILES = ('FreeCAD_SendToOpenSpindle.FCMacro',
          'freecad/makera_bridge/__init__.py',
-         'freecad/makera_bridge/bridge.py',
-         'freecad/makera_bridge/cam.py',
-         'freecad/makera_bridge/handoff.py')
+         'freecad/makera_bridge/commands.py')
 ROOT = 'FreeCADMakeraBridge'
 LAUNCHER = 'Klargjor_pa_Z1.FCMacro'
 WRAPPER = '''# Managed by FreeCADMakeraBridge installer; do not edit.
@@ -71,8 +74,12 @@ def verify_revision(root, revision):
     if not isinstance(revision, str) or len(revision) != 64 or any(c not in '0123456789abcdef' for c in revision):
         raise ValueError('Invalid revision')
     directory = root/'versions'/revision
-    # Earlier standalone versions used three flat files. Keep them roll-backable.
-    files = LEGACY_FILES if (directory/'openspindle_bridge.py').is_file() else FILES
+    # The existing revision IDs cover the exact file layout used by their installer.
+    files = FILES
+    if (directory/'openspindle_bridge.py').is_file():
+        files = LEGACY_FILES
+    elif (directory/'freecad/makera_bridge/handoff.py').is_file():
+        files = LEGACY_PACKAGE_FILES
     version, actual, _ = payload(directory, files)
     if actual != revision:
         raise ValueError('Installed files were modified; installation has not been changed.')

@@ -11,9 +11,9 @@ def run():
 
     # Addon Manager may copy this macro by itself to FreeCAD's Macro directory.
     bundled = Path(__file__).resolve().parent / "freecad" / "makera_bridge"
-    if not (bundled / "handoff.py").is_file():
+    if not (bundled / "commands.py").is_file():
         try:
-            from freecad.makera_bridge.handoff import run as prepare
+            from freecad.makera_bridge.commands import run as prepare
         except ImportError:
             message = (
                 "Installer eller oppdater FreeCADMakeraBridge i Addon Manager og "
@@ -37,7 +37,7 @@ def run():
         spec.loader.exec_module(package)
         from importlib import import_module
 
-        import_module(name + ".handoff").run()
+        import_module(name + ".commands").run()
     finally:
         for module_name in tuple(sys.modules):
             if module_name == name or module_name.startswith(name + "."):
