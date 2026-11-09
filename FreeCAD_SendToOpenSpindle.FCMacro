@@ -1,0 +1,48 @@
+# -*- coding: utf-8 -*-
+"""Send a CAM job using the addon or the standalone installer's private copy."""
+import importlib.util
+from pathlib import Path
+import sys
+
+
+def run():
+    import FreeCAD as App
+    from PySide import QtWidgets
+
+    # Addon Manager may copy this macro by itself to FreeCAD's Macro directory.
+    bundled = Path(__file__).resolve().parent / "freecad" / "makera_bridge"
+    if not (bundled / "commands.py").is_file():
+        try:
+            from freecad.makera_bridge.commands import run as prepare
+        except ImportError:
+            message = (
+                "Installer eller oppdater FreeCADMakeraBridge i Addon Manager og "
+                "bruk Send jobb til OpenSpindle i CAM. For separat makroinstallasjon, "
+                "pakk ut hele ZIP-filen og kjør installasjonsmakroen."
+            )
+            App.Console.PrintError(message + "\n")
+            QtWidgets.QMessageBox.critical(None, "Klargjør på Z1", message)
+            return
+        prepare()
+        return
+
+    # Load the active standalone revision without changing FreeCAD's import path.
+    name = "_makera_bridge_" + bundled.parents[1].name.encode("utf-8").hex()
+    spec = importlib.util.spec_from_file_location(
+        name, bundled / "__init__.py", submodule_search_locations=[str(bundled)]
+    )
+    package = importlib.util.module_from_spec(spec)
+    sys.modules[name] = package
+    try:
+        spec.loader.exec_module(package)
+        from importlib import import_module
+
+        import_module(name + ".commands").run()
+    finally:
+        for module_name in tuple(sys.modules):
+            if module_name == name or module_name.startswith(name + "."):
+                sys.modules.pop(module_name, None)
+
+
+if __name__ == "__main__" or "FreeCAD" in globals():
+    run()

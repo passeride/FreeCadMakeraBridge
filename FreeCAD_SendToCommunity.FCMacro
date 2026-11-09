@@ -173,3 +173,4 @@ def run():
 
 if __name__ == "__main__" or "FreeCAD" in globals():
     run()
+
