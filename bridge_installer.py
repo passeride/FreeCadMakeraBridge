@@ -7,8 +7,13 @@ from pathlib import Path
 import shutil
 import tempfile
 
-FILES = ('FreeCAD_SendToCommunity.FCMacro', 'FreeCAD_SendToOpenSpindle.FCMacro',
-         'openspindle_bridge.py')
+LEGACY_FILES = ('FreeCAD_SendToCommunity.FCMacro', 'FreeCAD_SendToOpenSpindle.FCMacro',
+                'openspindle_bridge.py')
+FILES = ('FreeCAD_SendToOpenSpindle.FCMacro',
+         'freecad/makera_bridge/__init__.py',
+         'freecad/makera_bridge/bridge.py',
+         'freecad/makera_bridge/cam.py',
+         'freecad/makera_bridge/handoff.py')
 ROOT = 'FreeCADMakeraBridge'
 LAUNCHER = 'Klargjor_pa_Z1.FCMacro'
 WRAPPER = '''# Managed by FreeCADMakeraBridge installer; do not edit.
@@ -41,9 +46,9 @@ def atomic_json(path, data):
         Path(name).unlink(missing_ok=True)
 
 
-def payload(source):
+def payload(source, files=FILES):
     source = Path(source)
-    data = {name: (source/name).read_bytes() for name in FILES}
+    data = {name: (source/name).read_bytes() for name in files}
     for name, content in data.items():
         compile(content, name, 'exec')
     version = (source/'VERSION').read_text().strip()
@@ -66,7 +71,9 @@ def verify_revision(root, revision):
     if not isinstance(revision, str) or len(revision) != 64 or any(c not in '0123456789abcdef' for c in revision):
         raise ValueError('Invalid revision')
     directory = root/'versions'/revision
-    version, actual, _ = payload(directory)
+    # Earlier standalone versions used three flat files. Keep them roll-backable.
+    files = LEGACY_FILES if (directory/'openspindle_bridge.py').is_file() else FILES
+    version, actual, _ = payload(directory, files)
     if actual != revision:
         raise ValueError('Installed files were modified; installation has not been changed.')
     return version
@@ -92,7 +99,9 @@ def install(source, macro_dir):
         stage = Path(tempfile.mkdtemp(prefix='.install-', dir=versions))
         try:
             for name, content in data.items():
-                (stage/name).write_bytes(content)
+                target = stage/name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(content)
             (stage/'VERSION').write_text(version, encoding='utf-8')
             os.rename(stage, destination)
         finally:

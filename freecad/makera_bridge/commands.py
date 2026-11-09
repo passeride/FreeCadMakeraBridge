@@ -1,6 +1,5 @@
 """Lightweight command registered for the CAM toolbar."""
 from pathlib import Path
-import runpy
 
 
 class PrepareCommand:
@@ -14,8 +13,9 @@ class PrepareCommand:
         return App.ActiveDocument is not None
 
     def Activated(self):
-        root = Path(__file__).resolve().parents[2]
-        runpy.run_path(str(root/'FreeCAD_SendToOpenSpindle.FCMacro'), run_name='__main__')
+        from .handoff import run
+
+        run()
 
 
 def register():

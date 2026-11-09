@@ -21,7 +21,8 @@ and remain a prerequisite for using that receiver; this new path bypasses it.
 
 ## Manual acceptance before using on a machine
 
-1. Put all three macro/module files together in FreeCAD's macro directory.
+1. Install via Addon Manager or the complete standalone ZIP. Restart FreeCAD,
+   select CAM, and click **Klargjør på Z1** on the Makera Bridge toolbar.
 2. Use a Machine-based CAM Job with the intended Makera post. Include profile
    tabs, a pocket, drilling and multiple tools in representative test jobs.
 3. Run the new macro with opening disabled. Compare the NC against the normal

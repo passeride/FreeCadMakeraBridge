@@ -12,6 +12,7 @@ class InstallerTests(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.source = self.base/'source'; self.source.mkdir()
         for name in installer.FILES:
+            (self.source/name).parent.mkdir(parents=True, exist_ok=True)
             (self.source/name).write_text('x = 1\n')
         (self.source/'VERSION').write_text('0.1')
         self.target = self.base/'Macro'
@@ -29,6 +30,28 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(installer.rollback(self.target)['active'], first['active'])
         self.assertEqual(installer.rollback(self.target)['active'], second['active'])
         self.assertEqual((self.target/'Mine.FCMacro').read_text(), 'mine')
+
+    def test_update_preserves_rollback_to_legacy_flat_layout(self):
+        import hashlib
+
+        version = '0.2.0'
+        content = b'x = 1\n'
+        digest = hashlib.sha256(version.encode() + b'\0')
+        for name in sorted(installer.LEGACY_FILES):
+            digest.update(name.encode() + b'\0' + content + b'\0')
+        legacy_id = digest.hexdigest()
+        root = self.target / installer.ROOT
+        legacy = root / 'versions' / legacy_id
+        legacy.mkdir(parents=True)
+        for name in installer.LEGACY_FILES:
+            (legacy / name).write_bytes(content)
+        (legacy / 'VERSION').write_text(version)
+        installer.atomic_json(root / 'active.json', {
+            'version': version, 'active': legacy_id, 'previous': None,
+        })
+        new = installer.install(self.source, self.target)
+        self.assertEqual(new['previous'], legacy_id)
+        self.assertEqual(installer.rollback(self.target)['active'], legacy_id)
 
     def test_failure_to_activate_keeps_previous_version(self):
         first = installer.install(self.source, self.target)
@@ -71,7 +94,7 @@ class InstallerTests(unittest.TestCase):
         source = self.base/'download'/'FreeCADMakeraBridge'
         api = runpy.run_path(str(source/'bridge_installer.py'), run_name='package_test')
         state = api['install'](source, self.target)
-        self.assertEqual(api['verify_revision'](self.target/installer.ROOT, state['active']), '0.2.0')
+        self.assertEqual(api['verify_revision'](self.target/installer.ROOT, state['active']), (source/'VERSION').read_text().strip())
 
     def test_fresh_install_requires_no_rollback(self):
         with self.assertRaises(ValueError):

@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
-import openspindle_bridge as bridge
+from freecad.makera_bridge import bridge
 
 
 class ReceiverTests(unittest.TestCase):

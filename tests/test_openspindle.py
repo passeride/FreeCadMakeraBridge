@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock
-import openspindle_bridge as bridge
+from freecad.makera_bridge import bridge
 
 
 class HandoffTests(unittest.TestCase):

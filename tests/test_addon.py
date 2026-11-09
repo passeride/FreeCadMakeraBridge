@@ -1,4 +1,6 @@
 import importlib
+import runpy
+import tempfile
 from pathlib import Path
 import sys
 import types
@@ -53,9 +55,20 @@ class AddonTests(unittest.TestCase):
             self.assertFalse(command.IsActive())
             app.ActiveDocument = object()
             self.assertTrue(command.IsActive())
-        with patch('freecad.makera_bridge.commands.runpy.run_path') as run:
+        with patch('freecad.makera_bridge.handoff.run') as run:
             command.Activated()
-            path = Path(run.call_args.args[0])
-            self.assertTrue(path.is_file())
-            self.assertEqual(path.name, 'FreeCAD_SendToOpenSpindle.FCMacro')
-            self.assertEqual(run.call_args.kwargs, {'run_name': '__main__'})
+            run.assert_called_once_with()
+
+    def test_macro_copied_to_macro_directory_uses_installed_addon(self):
+        source = Path(__file__).resolve().parents[1] / 'FreeCAD_SendToOpenSpindle.FCMacro'
+        with tempfile.TemporaryDirectory() as directory:
+            macro = Path(directory) / source.name
+            macro.write_bytes(source.read_bytes())
+            app = types.ModuleType('FreeCAD')
+            pyside = types.ModuleType('PySide')
+            pyside.QtWidgets = Mock()
+            with patch.dict(sys.modules, {'FreeCAD': app, 'PySide': pyside}), patch(
+                'freecad.makera_bridge.handoff.run'
+            ) as run:
+                runpy.run_path(str(macro), run_name='__main__')
+            run.assert_called_once_with()

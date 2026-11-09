@@ -29,7 +29,13 @@ are still needed. The addon does not install OpenSpindle or add Linux support
 to OpenSpindle itself. GUI discovery and end-to-end installation need testing
 on the user's FreeCAD build.
 
-For updates use Addon Manager's update operation and restart FreeCAD. Preferences
+For updates use Addon Manager's update operation and restart FreeCAD. If a
+previous installation still reports a missing `FreeCAD_SendToOpenSpindle.FCMacro`,
+reinstall the addon from the configured branch and restart FreeCAD. Use the
+CAM toolbar button after restarting. Addon Manager may copy a launcher macro
+to a different FreeCAD Macro directory. The toolbar loads the Python dialog
+from its own addon package. The current launcher also works with the installed
+addon when it is copied by itself. Preferences
 and exported jobs live outside the addon checkout. Do not use the standalone
 installer to update this checkout: choose one installation method. If migrating
 from the macro installer, remove its launcher and private runtime directory after

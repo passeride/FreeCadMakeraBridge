@@ -18,7 +18,7 @@ The runtime is copied into the macro directory. The downloaded package can be
 removed afterwards. Installation affects only the current user's chosen macro
 folder. No pip, Poetry, terminal, administrator rights or running CNC is required.
 OpenSpindle itself must be installed separately. Existing Community macros are
-not replaced: the new install keeps its own private helper copy.
+not replaced. The standalone installer keeps its own private Python package.
 
 ## Updates
 
