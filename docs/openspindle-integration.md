@@ -22,19 +22,15 @@ and remain a prerequisite for using that receiver; this new path bypasses it.
 
 ## Z1 approach after a tool change
 
-When the CAM toolbar sends an absolute, metric three-axis job using
-`makera_z1_named` or `makera_z1`, the bridge separates the first supported
-rapid approach after each tool change into a machine-coordinate lift to Z-3,
-a traverse to the operation's first XY point, and a descent to the post's
-original work Z. It waits for each lift and traverse to finish. The lift uses
-the Z1 clearance used by OpenSpindle, with headroom below the upper soft limit.
-Use an OpenSpindle build that accepts this Z1 retract in cutting operations.
+The bridge preserves the Makera post's NC output. OpenSpindle adds its own
+machine-coordinate clearance retract at operation boundaries when it combines
+the imported operation, so the bridge must not inject `G53` blocks into a
+regular cutting operation. OpenSpindle treats those blocks as probe travel
+unless they are part of a probing operation with the probe active.
 
-This applies to a combined XYZ rapid or a Z-only rapid followed by XY at the
-same height. Rotary programs and other approach patterns keep the original
-post output. FreeCAD's standard Post command still calls the installed
-postprocessor directly. The handoff does not start the machine. Check the
-clearance of the tool, clamps and workpiece in the actual setup.
+FreeCAD's standard Post command still calls the installed postprocessor
+directly. The handoff does not start the machine. Check the clearance of the
+tool, clamps and workpiece in the actual setup.
 
 ## Manual acceptance before using on a machine
 

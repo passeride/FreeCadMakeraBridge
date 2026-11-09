@@ -252,79 +252,6 @@ def selected_operation(doc, selection, is_active):
     return job, operation
 
 
-# These are the absolute, metric approach blocks emitted by the Z1 post.
-_NC_NUMBER = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)"
-_Z1_TOOL_CHANGE = re.compile(r"(?:T\d+\s+M0*6|M0*6\s+T\d+)")
-_Z1_APPROACH_SETUP = re.compile(
-    rf"(?:M0*[345789](?:\s+S{_NC_NUMBER})?|S{_NC_NUMBER}|"
-    r"G(?:17|21|54|90|94)(?:\s+G(?:17|21|54|90|94))*)"
-)
-_Z1_APPROACH_Z = re.compile(rf"G0+\s+Z(?P<z>{_NC_NUMBER})")
-_Z1_APPROACH_XY = re.compile(
-    rf"G0+\s+X(?P<x>{_NC_NUMBER})\s+Y(?P<y>{_NC_NUMBER})"
-    rf"(?:\s+Z(?P<z>{_NC_NUMBER}))?"
-)
-
-
-def z1_high_approach(gcode):
-    """Keep the first traverse after each M6 at the Z1's machine clearance."""
-    lines = gcode.splitlines(keepends=True)
-    blocks = [re.sub(r"\([^)]*\)|;[^\r\n]*", "", line).strip().upper() for line in lines]
-    if any(re.search(r"[ABC]\s*[+\-\d.]", block) for block in blocks):
-        return gcode
-
-    metric = absolute = waiting = False
-    for index, block in enumerate(blocks):
-        for mode in re.findall(r"G(20|21|90|91)(?![\d.])", block):
-            if mode in ("20", "21"):
-                metric = mode == "21"
-            else:
-                absolute = mode == "90"
-        if _Z1_TOOL_CHANGE.fullmatch(block):
-            waiting = True
-            continue
-        if not waiting or not block or _Z1_APPROACH_SETUP.fullmatch(block):
-            continue
-        waiting = False
-        if not (metric and absolute):
-            continue
-
-        # A Z-only rapid immediately followed by XY at the same height, or a
-        # single XYZ rapid. Match the literal motion lines to preserve comments
-        # and avoid rewriting unfamiliar fields or modal/relative travel.
-        first_z = _Z1_APPROACH_Z.fullmatch(lines[index].strip().upper())
-        xy_index = index
-        if first_z:
-            xy_index = next(
-                (j for j in range(index + 1, len(blocks)) if blocks[j]), len(blocks)
-            )
-            if xy_index == len(blocks):
-                continue
-        xy = _Z1_APPROACH_XY.fullmatch(lines[xy_index].strip().upper())
-        if not xy:
-            continue
-        z = xy["z"]
-        if first_z:
-            if z is not None and float(z) != float(first_z["z"]):
-                continue
-            z = first_z["z"]
-        if z is None:
-            continue
-
-        newline = "\r\n" if lines[index].endswith("\r\n") else "\n"
-        # Z-3 is the clearance used by the Z1 integration, below its upper
-        # soft limit. M400 prevents the planner blending Z and XY at either end.
-        lift = newline.join(("G53 G0 Z-3", "M400", ""))
-        traverse = newline.join((f'G0 X{xy["x"]} Y{xy["y"]}', "M400", f"G0 Z{z}"))
-        ending = newline if lines[xy_index].endswith(("\r", "\n")) else ""
-        if first_z:
-            lines[index] = lift
-            lines[xy_index] = traverse + ending
-        else:
-            lines[index] = lift + traverse + ending
-    return "".join(lines)
-
-
 def postprocess(job, operations=None):
     from Path.Post.Processor import PostProcessorFactory
     from Machine.models.machine import MachineFactory
@@ -376,8 +303,6 @@ def postprocess(job, operations=None):
     if not isinstance(section, (tuple, list)) or len(section) != 2:
         raise RuntimeError("Ukjent svar fra FreeCAD-postprosessoren.")
     gcode = section[1]
-    if isinstance(gcode, str) and name.casefold() in ("makera_z1_named", "makera_z1"):
-        gcode = z1_high_approach(gcode)
     validate_nc(gcode)
     return gcode, name
 
