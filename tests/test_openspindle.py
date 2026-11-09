@@ -41,8 +41,8 @@ class HandoffTests(unittest.TestCase):
             self.assertNotEqual(a, b)
             self.assertEqual(a.read_text(), code)
             self.assertEqual(ma['program']['sha256'], mb['program']['sha256'])
-            self.assertEqual(json.loads((a.parent/'handoff.json').read_text())['status'], 'exported_locally')
-            self.assertEqual(a.parent.parent, Path(folder))
+            self.assertEqual(json.loads((a.parent/'handoff.json').read_text(encoding='utf-8'))['status'], 'exported_locally')
+            self.assertEqual(a.parent.parent, Path(folder).resolve())
             self.assertFalse(list(Path(folder).glob('.export-*')))
             _, changed = bridge.publish(folder, code+'G1X3\n', source)
             self.assertNotEqual(ma['program']['sha256'], changed['program']['sha256'])
@@ -60,7 +60,7 @@ class HandoffTests(unittest.TestCase):
             nc.write_text('G1X1')
             process = Mock()
             bridge.launch(executable, nc, platform='win32', popen=process)
-            process.assert_called_once_with([str(executable), str(nc)], shell=False)
+            process.assert_called_once_with([str(executable.resolve()), str(nc.resolve())], shell=False)
 
     def test_missing_app_keeps_export_available(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -104,7 +104,7 @@ class HandoffTests(unittest.TestCase):
             nc = Path(folder)/'job.nc'; nc.touch()
             process = Mock()
             bridge.launch(app, nc, platform='darwin', popen=process)
-            process.assert_called_once_with(['/usr/bin/open', '-a', str(app), str(nc)], shell=False)
+            process.assert_called_once_with(['/usr/bin/open', '-a', str(app.resolve()), str(nc.resolve())], shell=False)
 
     def test_recompute_errors_block_export(self):
         obj = Mock(Label='Pocket', State=['Invalid'])

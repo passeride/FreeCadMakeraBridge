@@ -29,7 +29,7 @@ class ReceiverTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             app = Path(folder)/'OpenSpindle.exe'; app.touch()
             result = bridge.configure_receiver('', True, lambda _: 'find', lambda: str(app), Mock(), platform='win32')
-            self.assertEqual(result, (str(app), True))
+            self.assertEqual(result, (str(app.resolve()), True))
 
     def test_cancel_file_picker_returns_to_choice(self):
         actions = iter(['find', 'export'])
@@ -41,7 +41,7 @@ class ReceiverTests(unittest.TestCase):
             app = Path(folder)/'Programs/openspindle/OpenSpindle.exe'
             app.parent.mkdir(parents=True); app.touch()
             with patch.object(bridge.shutil, 'which', return_value=None):
-                self.assertEqual(bridge.discover_receiver('win32', {'LOCALAPPDATA': folder}), str(app))
+                self.assertEqual(bridge.discover_receiver('win32', {'LOCALAPPDATA': folder}), str(app.resolve()))
             with patch.object(bridge.os, 'access', return_value=False):
                 with self.assertRaises(ValueError):
                     bridge.receiver_path(app, 'linux')
