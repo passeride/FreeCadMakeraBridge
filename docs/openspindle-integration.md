@@ -20,6 +20,22 @@ and remain a prerequisite for using that receiver; this new path bypasses it.
 | Machine panel, collision verification, job history | Future; controlled by receiver implementation |
 | Physical machine validation | Required; not performed |
 
+## Z1 approach after a tool change
+
+When the CAM toolbar sends an absolute, metric three-axis job using
+`makera_z1_named` or `makera_z1`, the bridge separates the first supported
+rapid approach after each tool change into a machine-coordinate lift to Z-3,
+a traverse to the operation's first XY point, and a descent to the post's
+original work Z. It waits for each lift and traverse to finish. The lift uses
+the Z1 clearance used by OpenSpindle, with headroom below the upper soft limit.
+Use an OpenSpindle build that accepts this Z1 retract in cutting operations.
+
+This applies to a combined XYZ rapid or a Z-only rapid followed by XY at the
+same height. Rotary programs and other approach patterns keep the original
+post output. FreeCAD's standard Post command still calls the installed
+postprocessor directly. The handoff does not start the machine. Check the
+clearance of the tool, clamps and workpiece in the actual setup.
+
 ## Manual acceptance before using on a machine
 
 1. Install via Addon Manager and restart FreeCAD. Select CAM and use **Send jobb
