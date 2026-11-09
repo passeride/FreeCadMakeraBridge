@@ -3,7 +3,7 @@ import types
 import unittest
 from unittest.mock import Mock, patch
 
-from freecad.makera_bridge.commands import postprocess
+from freecad.makera_bridge.commands import postprocess, z1_clearance_retract
 
 
 class PostprocessTests(unittest.TestCase):
@@ -67,7 +67,7 @@ class PostprocessTests(unittest.TestCase):
                         ("M3 S10000\nG1 X1 F100\n", "makera_z1_named"),
                     )
 
-    def test_z1_export_preserves_post_output_for_openspindle_boundaries(self):
+    def test_z1_export_adds_only_cutting_clearance_before_approach(self):
         source = (
             "G90 G94\nG17\nG21\nG54\nM05\nT2 M6\nM3 S12000.0\n"
             "(Vcarve)\n(starting)\nG0 Z3.000\nG0 X59.059 Y90.653 Z3.000\n"
@@ -83,6 +83,19 @@ class PostprocessTests(unittest.TestCase):
             job = types.SimpleNamespace(Machine="Z1")
             machine.postprocessor_file_name = "makera_z1_named"
             exported, _ = postprocess(job)
-            self.assertEqual(exported, source)
+            self.assertEqual(exported, source.replace(
+                "(starting)\nG0 Z3.000",
+                "(starting)\nG53 G0 Z-3\nM400\nG0 Z3.000",
+            ))
             machine.postprocessor_file_name = "makera_carvera"
             self.assertEqual(postprocess(job)[0], source)
+
+    def test_z1_clearance_retract_handles_each_tool_and_is_idempotent(self):
+        source = (
+            "G21 G90\r\nT2 M6\r\nG00 X20 Y30 Z3\r\nG1 Z-1\r\n"
+            "M5\r\nM06 T3\r\nG0 Z4\r\nG0 X21 Y31"
+        )
+        result = z1_clearance_retract(source)
+        self.assertIn("G53 G0 Z-3\r\nM400\r\nG00 X20 Y30 Z3", result)
+        self.assertTrue(result.endswith("G53 G0 Z-3\r\nM400\r\nG0 Z4\r\nG0 X21 Y31"))
+        self.assertEqual(z1_clearance_retract(result), result)

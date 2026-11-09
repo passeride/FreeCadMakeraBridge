@@ -22,11 +22,11 @@ and remain a prerequisite for using that receiver; this new path bypasses it.
 
 ## Z1 approach after a tool change
 
-The bridge preserves the Makera post's NC output. OpenSpindle adds its own
-machine-coordinate clearance retract at operation boundaries when it combines
-the imported operation, so the bridge must not inject `G53` blocks into a
-regular cutting operation. OpenSpindle treats those blocks as probe travel
-unless they are part of a probing operation with the probe active.
+For `makera_z1_named` and `makera_z1`, the bridge inserts only the Z1's
+machine-coordinate clearance retract, `G53 G0 Z-3`, before the first approach
+after each tool change. It does not add machine-coordinate X/Y moves. Current
+OpenSpindle builds accept this explicit cutting retract and use it to verify
+that the following XY travel cannot pass through the tool setter.
 
 FreeCAD's standard Post command still calls the installed postprocessor
 directly. The handoff does not start the machine. Check the clearance of the
