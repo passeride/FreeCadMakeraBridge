@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "name": "Makera Metal O-flute Ø1 × 3 mm",
+  "shape": "endmill.fcstd",
+  "shape-type": "Endmill",
+  "parameter": {
+    "Diameter": "1 mm",
+    "Length": "38 mm",
+    "ShankDiameter": "3.175 mm",
+    "Units": "Metric",
+    "CuttingEdgeHeight": "3 mm"
+  },
+  "attribute": {
+    "Flutes": "1"
+  }
+}

@@ -24,6 +24,25 @@ an existing three-axis job, select **Makera Z1 3-axis - Makera Bridge** in the
 job's Machine settings. Existing jobs keep their chosen machine until you
 change it. The bundled machine is for three-axis milling.
 
+## Machine profiles and tool library
+
+The Machines list includes three-axis profiles for **Makera Z1** and
+**Makera Z1 Pro**. Both select the bundled `makera_z1_bridge` post.
+**Ny Z1-jobb** defaults to Z1. For the Pro, select the Pro profile in the
+job's Machine settings. Rotary machining requires a separate setup.
+
+On restart after installation, the addon adds **Makera Bridge - Z1** to
+CAM's Tool Bit Library. It includes the Makera 90°, 60° and 30° engraving
+profiles, three O-flute sizes, a 2 mm drill and a 2 mm ball nose. The
+definitions use FreeCAD's built-in shapes. Check the geometry against your
+physical bit and set feeds and speeds for the job.
+
+The tool library and bits go into the CAM asset directory configured in
+FreeCAD, under `Tools/Library` and `Tools/Bit`. Only missing files are
+installed. Existing tool files, including your changes to these bits, are
+kept on update and after removing the addon. Restart after changing the
+CAM asset directory to install the library in the new location.
+
 For updates use Addon Manager's update operation and restart FreeCAD. If a
 previous installation still reports a missing `FreeCAD_SendToOpenSpindle.FCMacro`
 or `freecad.makera_bridge.handoff`, update to the latest version and restart FreeCAD.

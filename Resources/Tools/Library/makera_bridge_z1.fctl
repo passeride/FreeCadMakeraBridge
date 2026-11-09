@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "label": "Makera Bridge - Z1",
+  "tools": [
+    {
+      "nr": 1,
+      "path": "makera_bridge_z1_v90.fctb"
+    },
+    {
+      "nr": 2,
+      "path": "makera_bridge_z1_v60.fctb"
+    },
+    {
+      "nr": 3,
+      "path": "makera_bridge_z1_v30.fctb"
+    },
+    {
+      "nr": 4,
+      "path": "makera_bridge_z1_o-flute-1mm.fctb"
+    },
+    {
+      "nr": 5,
+      "path": "makera_bridge_z1_o-flute-2mm.fctb"
+    },
+    {
+      "nr": 6,
+      "path": "makera_bridge_z1_o-flute-3_175mm.fctb"
+    },
+    {
+      "nr": 7,
+      "path": "makera_bridge_z1_drill-2mm.fctb"
+    },
+    {
+      "nr": 8,
+      "path": "makera_bridge_z1_ball-2mm.fctb"
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "freecad_version": "26.3.0",
+  "machine": {
+    "name": "Makera Z1 Pro 3-axis - Makera Bridge",
+    "manufacturer": "Makera",
+    "description": "Three-axis Makera Z1 Pro with manual tool change",
+    "units": "metric",
+    "axes": {
+      "X": {
+        "type": "linear",
+        "role": "head_linear",
+        "parent": null,
+        "sequence": 0,
+        "joint": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "limits": {
+          "min": 0,
+          "max": 200
+        },
+        "max_velocity": 2000
+      },
+      "Y": {
+        "type": "linear",
+        "role": "table_linear",
+        "parent": null,
+        "sequence": 0,
+        "joint": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ]
+        ],
+        "limits": {
+          "min": 0,
+          "max": 200
+        },
+        "max_velocity": 2000
+      },
+      "Z": {
+        "type": "linear",
+        "role": "head_linear",
+        "parent": "X",
+        "sequence": 0,
+        "joint": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "limits": {
+          "min": 0,
+          "max": 100
+        },
+        "max_velocity": 2000
+      }
+    },
+    "toolheads": [
+      {
+        "id": "spindle",
+        "name": "Z1 spindle",
+        "toolhead_type": "rotary",
+        "tool_change": "manual",
+        "max_power_kw": 0.15,
+        "max_rpm": 13000
+      }
+    ]
+  },
+  "output": {
+    "units": "metric",
+    "output_tool_length_offset": false,
+    "remote_post": false,
+    "comments": {
+      "enabled": true,
+      "symbol": "("
+    },
+    "formatting": {
+      "line_numbers": false,
+      "command_space": " ",
+      "end_of_line_chars": "\n"
+    },
+    "duplicates": {
+      "commands": true,
+      "parameters": true
+    },
+    "precision": {
+      "axis": 3,
+      "feed": 2,
+      "spindle": 0
+    }
+  },
+  "postprocessor": {
+    "file_name": "makera_z1_bridge",
+    "properties": {
+      "axis_precision": 3,
+      "feed_precision": 2
+    }
+  },
+  "processing": {
+    "tool_change": true,
+    "translate_drill_cycles": true,
+    "xy_before_z_after_tool_change": false
+  },
+  "version": 1
+}

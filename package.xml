@@ -2,7 +2,7 @@
 <package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
   <name>FreeCADMakeraBridge</name>
   <description>Prepare CAM Machine jobs for local inspection in OpenSpindle. Experimental integration; no automatic machining start.</description>
-  <version>0.3.0</version>
+  <version>0.3.1</version>
   <date>2026-11-09</date>
   <freecadmin>26.3.0</freecadmin>
   <pythonmin>3.10</pythonmin>

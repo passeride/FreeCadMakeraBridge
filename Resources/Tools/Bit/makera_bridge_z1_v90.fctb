@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "name": "Makera Chamfer bit 90° × 0.1 mm tip",
+  "shape": "v-bit.fcstd",
+  "shape-type": "VBit",
+  "parameter": {
+    "Diameter": "3.175 mm",
+    "Length": "38 mm",
+    "ShankDiameter": "3.175 mm",
+    "Units": "Metric",
+    "CuttingEdgeHeight": "3 mm",
+    "CuttingEdgeAngle": "90 °",
+    "TipDiameter": "0.1 mm"
+  },
+  "attribute": {
+    "Flutes": "2"
+  }
+}

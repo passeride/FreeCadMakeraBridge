@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "name": "Makera Metal engraving bit 30° × 0.2 mm tip",
+  "shape": "v-bit.fcstd",
+  "shape-type": "VBit",
+  "parameter": {
+    "Diameter": "3.175 mm",
+    "Length": "38 mm",
+    "ShankDiameter": "3.175 mm",
+    "Units": "Metric",
+    "CuttingEdgeHeight": "9 mm",
+    "CuttingEdgeAngle": "30 °",
+    "TipDiameter": "0.2 mm"
+  },
+  "attribute": {
+    "Flutes": "1"
+  }
+}

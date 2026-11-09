@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "name": "Makera Metal ball nose Ø2 × 6 mm",
+  "shape": "ballend.fcstd",
+  "shape-type": "Ballend",
+  "parameter": {
+    "Diameter": "2 mm",
+    "Length": "38 mm",
+    "ShankDiameter": "3.175 mm",
+    "Units": "Metric",
+    "CuttingEdgeHeight": "6 mm"
+  },
+  "attribute": {
+    "Flutes": "2"
+  }
+}

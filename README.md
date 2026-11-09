@@ -31,6 +31,8 @@ Add this repository as a custom repository in **Tools → Addon Manager**.
 Install or update **FreeCADMakeraBridge** from the default branch and restart
 FreeCAD 26.3 or later. In CAM, use **Ny Z1-jobb** to open the normal model picker
 with the bundled three-axis Makera Z1 machine and its post already selected.
+A three-axis Z1 Pro profile and the **Makera Bridge - Z1** tool library are
+also installed.
 
 Set up the stock, work origin and tool in FreeCAD. Use **Send jobb til
 OpenSpindle** or select an active operation and use **Send operasjon til

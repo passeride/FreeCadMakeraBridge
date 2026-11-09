@@ -31,6 +31,39 @@ class AddonTests(unittest.TestCase):
         self.assertEqual(set(profile['machine']['axes']), {'X', 'Y', 'Z'})
         self.assertTrue((posts / (profile['postprocessor']['file_name'] + '_post.py')).is_file())
 
+    def test_z1_assets_install_into_cam_directory_and_preserve_user_edits(self):
+        machine_module = types.SimpleNamespace(MachineFactory=Mock())
+        root = Path(__file__).resolve().parents[1]
+        profiles = sorted((root / 'Resources' / 'Machines').glob('*.fcm'))
+        self.assertEqual(len(profiles), 2)
+        for profile in profiles:
+            data = json.loads(profile.read_text(encoding='utf-8'))
+            self.assertEqual(set(data['machine']['axes']), {'X', 'Y', 'Z'})
+            self.assertEqual(data['postprocessor']['file_name'], 'makera_z1_bridge')
+        with tempfile.TemporaryDirectory() as directory:
+            assets = Path(directory) / 'custom'
+            prefs = types.SimpleNamespace(getAssetPath=lambda: assets, addAddonPostPath=Mock())
+            modules = {'Machine.models.machine': machine_module, 'Path': types.SimpleNamespace(Preferences=prefs),
+                       'FreeCAD': types.SimpleNamespace(Console=Mock())}
+            with patch.dict(sys.modules, modules):
+                spec = importlib.util.spec_from_file_location(
+                    'isolated_z1_asset_init', root / 'freecad' / 'makera_bridge' / 'init.py')
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                paths = assets / 'Tools'
+                library = json.loads((paths / 'Library' / 'makera_bridge_z1.fctl').read_text(encoding='utf-8'))
+                self.assertEqual(len(library['tools']), 8)
+                for entry in library['tools']:
+                    self.assertTrue((paths / 'Bit' / entry['path']).is_file())
+                modified = paths / 'Bit' / library['tools'][0]['path']
+                modified.write_text('user data', encoding='utf-8')
+                removed = paths / 'Bit' / library['tools'][1]['path']
+                removed.unlink()
+                module.register_z1_assets()
+                self.assertEqual(modified.read_text(encoding='utf-8'), 'user data')
+                self.assertTrue(removed.is_file())
+                prefs.addAddonPostPath.assert_called_with(str(root / 'Resources' / 'Post'))
+
     def test_toolbar_is_scoped_to_cam_without_extra_workbench(self):
         gui = types.ModuleType('FreeCADGui')
         gui.addWorkbench = Mock()

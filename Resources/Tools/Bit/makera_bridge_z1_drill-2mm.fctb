@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "name": "Makera Drill Ø2 × 12 mm",
+  "shape": "drill.fcstd",
+  "shape-type": "Drill",
+  "parameter": {
+    "Diameter": "2 mm",
+    "Length": "38 mm",
+    "ShankDiameter": "3.175 mm",
+    "Units": "Metric",
+    "TipAngle": "118 °"
+  },
+  "attribute": {
+    "Flutes": "2"
+  }
+}
