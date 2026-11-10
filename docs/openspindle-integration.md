@@ -27,17 +27,20 @@ selected through its Machine on an existing three-axis job. In absolute,
 metric three-axis output it separates a recognized first rapid approach
 after a tool change into a machine-coordinate move to Z-3, an XY move to the
 first point, and then a descent to the programmed work Z. M400 waits for
-the lift and XY moves to finish. The same sequence is exported by **Post**
-and by the OpenSpindle handoff. Use an OpenSpindle build with support for
+the lift and XY moves to finish. When the post emits a standalone M3 after
+the tool change followed only by modal setup or comments before the rapid,
+the spindle starts after the XY move and before the descent. The same
+sequence is exported by **Post** and by the OpenSpindle handoff for the
+bundled post. Use an OpenSpindle build with support for
 `G53 G0 Z-3` in cutting operations.
 
 A combined XYZ rapid or a Z-only rapid followed by XY at the same height
 can be split this way. Other recognized approaches keep their programmed
 moves with a machine-clearance move inserted before them. Rotary programs
-and unrelated postprocessors retain their own output. The older
-`makera_z1_named` and `makera_z1` handoff paths retain their clearance
-retract and the original approach. Review the tool, clamps and workpiece
-in the actual setup before running.
+and unrelated postprocessors retain their own output. The OpenSpindle
+handoff applies the same approach to jobs using the older `makera_z1_named`
+and `makera_z1` posts. Review the tool, clamps and workpiece in the actual
+setup before running.
 
 ## Manual acceptance before using on a machine
 

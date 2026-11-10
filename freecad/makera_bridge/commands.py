@@ -254,9 +254,10 @@ def selected_operation(doc, selection, is_active):
 
 _NC_NUMBER = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)"
 _Z1_TOOL_CHANGE = re.compile(r"(?:T\d+\s+M0*6|M0*6\s+T\d+)")
+_Z1_SPINDLE_START = re.compile(rf"M0*3(?:\s+S{_NC_NUMBER})?")
+_Z1_APPROACH_MODES = r"G(?:17|21|54|90|94)(?:\s+G(?:17|21|54|90|94))*"
 _Z1_APPROACH_SETUP = re.compile(
-    rf"(?:M0*[345789](?:\s+S{_NC_NUMBER})?|S{_NC_NUMBER}|"
-    r"G(?:17|21|54|90|94)(?:\s+G(?:17|21|54|90|94))*)"
+    rf"(?:M0*[345789](?:\s+S{_NC_NUMBER})?|S{_NC_NUMBER}|{_Z1_APPROACH_MODES})"
 )
 _Z1_APPROACH_Z = re.compile(rf"G0+\s+Z(?P<z>{_NC_NUMBER})")
 _Z1_APPROACH_XY = re.compile(
@@ -265,14 +266,15 @@ _Z1_APPROACH_XY = re.compile(
 )
 
 
-def z1_clearance_retract(gcode, *, high_traverse=False):
-    """Retract before a recognized approach, optionally keeping XY at clearance."""
+def z1_clearance_retract(gcode):
+    """Keep a recognized tool approach at machine clearance until XY is in position."""
     lines = gcode.splitlines(keepends=True)
     blocks = [re.sub(r"\([^)]*\)|;[^\r\n]*", "", line).strip().upper() for line in lines]
     if any(re.search(r"[ABC]\s*[+\-\d.]", block) for block in blocks):
         return gcode
 
-    metric = absolute = waiting = False
+    metric = absolute = False
+    tool_change = None
     for index, block in enumerate(blocks):
         for mode in re.findall(r"G(20|21|90|91)(?![\d.])", block):
             if mode in ("20", "21"):
@@ -280,11 +282,12 @@ def z1_clearance_retract(gcode, *, high_traverse=False):
             else:
                 absolute = mode == "90"
         if _Z1_TOOL_CHANGE.fullmatch(block):
-            waiting = True
+            tool_change = index
             continue
-        if not waiting or not block or _Z1_APPROACH_SETUP.fullmatch(block):
+        if tool_change is None or not block or _Z1_APPROACH_SETUP.fullmatch(block):
             continue
-        waiting = False
+        setup = [j for j in range(tool_change + 1, index) if blocks[j]]
+        tool_change = None
         if not (metric and absolute):
             continue
 
@@ -306,11 +309,19 @@ def z1_clearance_retract(gcode, *, high_traverse=False):
         z = xy["z"]
         if first_z and z is None:
             z = first_z["z"]
-        if not high_traverse or z is None or (first_z and float(first_z["z"]) != float(z)):
+        if z is None or (first_z and float(first_z["z"]) != float(z)):
             lines[index] = retract + lines[index]
             continue
 
-        traverse = newline.join((f'G0 X{xy["x"]} Y{xy["y"]}', "M400", f"G0 Z{z}"))
+        traverse = newline.join((f'G0 X{xy["x"]} Y{xy["y"]}', "M400", ""))
+        # Move the post's standalone M3 past the traverse. Only move it across
+        # modal setup and comments, so auxiliary and spindle command order stays intact.
+        if setup and _Z1_SPINDLE_START.fullmatch(blocks[setup[0]]) and all(
+            re.fullmatch(_Z1_APPROACH_MODES, blocks[j]) for j in setup[1:]
+        ):
+            traverse += lines[setup[0]]
+            lines[setup[0]] = ""
+        traverse += f"G0 Z{z}"
         if lines[xy_index].endswith(("\r", "\n")):
             traverse += newline
         if first_z:
