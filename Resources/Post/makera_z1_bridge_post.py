@@ -31,4 +31,4 @@ class Makera_Z1_Bridge(Makera_26_Mch):
         sections = super().export2()
         if not sections:
             return sections
-        return [(name, z1_clearance_retract(nc, high_traverse=True)) for name, nc in sections]
+        return [(name, z1_clearance_retract(nc)) for name, nc in sections]
