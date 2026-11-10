@@ -264,6 +264,18 @@ _Z1_APPROACH_XY = re.compile(
     rf"G0+\s+X(?P<x>{_NC_NUMBER})\s+Y(?P<y>{_NC_NUMBER})"
     rf"(?:\s+Z(?P<z>{_NC_NUMBER}))?"
 )
+_Z1_MACHINE_XY = re.compile(rf"G53\s+G0+\s+X({_NC_NUMBER})\s+Y({_NC_NUMBER})")
+
+
+def _z1_center_script(blocks):
+    if len(blocks) != 5 or blocks[:3] != ["G21 G90", "G53 G0 Z-3", "M400"]:
+        return False
+    xy = _Z1_MACHINE_XY.fullmatch(blocks[3])
+    return (
+        xy is not None
+        and all(-200 <= float(axis) <= -1 for axis in xy.groups())
+        and blocks[4] == "M400"
+    )
 
 
 def z1_clearance_retract(gcode):
@@ -274,7 +286,8 @@ def z1_clearance_retract(gcode):
         return gcode
 
     metric = absolute = False
-    tool_change = None
+    setup_start = None
+    at_clearance = False
     for index, block in enumerate(blocks):
         for mode in re.findall(r"G(20|21|90|91)(?![\d.])", block):
             if mode in ("20", "21"):
@@ -282,12 +295,18 @@ def z1_clearance_retract(gcode):
             else:
                 absolute = mode == "90"
         if _Z1_TOOL_CHANGE.fullmatch(block):
-            tool_change = index
+            setup_start = index + 1
+            at_clearance = _z1_center_script(blocks[setup_start:setup_start + 5])
+            if at_clearance:
+                setup_start += 5
             continue
-        if tool_change is None or not block or _Z1_APPROACH_SETUP.fullmatch(block):
+        if (
+            setup_start is None or index < setup_start
+            or not block or _Z1_APPROACH_SETUP.fullmatch(block)
+        ):
             continue
-        setup = [j for j in range(tool_change + 1, index) if blocks[j]]
-        tool_change = None
+        setup = [j for j in range(setup_start, index) if blocks[j]]
+        setup_start = None
         if not (metric and absolute):
             continue
 
@@ -305,7 +324,7 @@ def z1_clearance_retract(gcode):
             continue
 
         newline = "\r\n" if lines[index].endswith("\r\n") else "\n"
-        retract = newline.join(("G53 G0 Z-3", "M400", ""))
+        retract = "" if at_clearance else newline.join(("G53 G0 Z-3", "M400", ""))
         z = xy["z"]
         if first_z and z is None:
             z = first_z["z"]

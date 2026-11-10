@@ -1,6 +1,8 @@
 import sys
+import json
 import types
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from freecad.makera_bridge.commands import postprocess, z1_clearance_retract
@@ -114,3 +116,16 @@ class PostprocessTests(unittest.TestCase):
             "M400\nG0 Z3.000\nG1 Z-1.850\n"
         )
         self.assertEqual(z1_clearance_retract(source), expected)
+
+    def test_bundled_profiles_reach_centre_before_spindle_or_descent(self):
+        profiles = Path(__file__).resolve().parents[1] / "Resources" / "Machines"
+        for profile in profiles.glob("*.fcm"):
+            with self.subTest(profile=profile.name):
+                properties = json.loads(profile.read_text())["postprocessor"]["properties"]
+                script = properties["post_tool_change"]
+                self.assertEqual(script, "G21 G90\nG53 G0 Z-3\nM400\nG53 G0 X-100 Y-100\nM400")
+                start = f"G21 G90\nM5\nT2 M6\n{script}\n"
+                source = start + "M3 S12000\nG54\nG0 Z5\nG0 X59 Y90 Z5\nG1 Z-1 F120\n"
+                expected = start + "G54\nG0 X59 Y90\nM400\nM3 S12000\nG0 Z5\nG1 Z-1 F120\n"
+                self.assertEqual(z1_clearance_retract(source), expected)
+                self.assertEqual(z1_clearance_retract(expected), expected)
