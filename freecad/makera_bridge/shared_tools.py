@@ -149,8 +149,37 @@ class SharedToolsCommand:
         from .commands import get_job
         parent = Gui.getMainWindow()
         try:
-            action, ok = QtWidgets.QInputDialog.getItem(parent, "Felles verktøybibliotek", "Handling", ["Importer fra OpenSpindle", "Eksporter jobbens verktøy"], 0, False)
+            action, ok = QtWidgets.QInputDialog.getItem(parent, "Felles verktøybibliotek", "Handling", ["Importer fra OpenSpindle", "Eksporter jobbens verktøy", "Importer fra vert", "Publiser jobbens verktøy til vert"], 0, False)
             if not ok:
+                return
+            if "vert" in action:
+                from .remote import settings, request
+                from .commands import preferences
+                address, key = settings(preferences())
+                remote, etag = request(address, key, "/api/tools")
+                if remote.get("schema") != SCHEMA or remote.get("units") != "mm" or not isinstance(remote.get("tools"), list) or len(remote["tools"]) > 10000:
+                    raise ValueError("Ukjent bibliotekformat fra verten.")
+                for tool in remote["tools"]:
+                    validate_entry(tool)
+                if action.startswith("Importer"):
+                    destination = QtWidgets.QFileDialog.getExistingDirectory(parent, "Velg mappe for ny biblioteksrevisjon")
+                    if not destination:
+                        return
+                    target = install_library(remote["tools"], destination)
+                    QtWidgets.QMessageBox.information(parent, "Felles verktøy", "Legg til biblioteket i FreeCAD:\n" + str(target))
+                    return
+                job = get_job(App.ActiveDocument, Gui.Selection.getSelection())
+                merged = {tool["id"]: tool for tool in remote["tools"]}
+                for controller in job.Tools.Group:
+                    entry = from_controller(controller)
+                    previous = merged.get(entry["id"])
+                    if previous and previous != entry:
+                        answer = QtWidgets.QMessageBox.question(parent, "Endret verktøy", "Erstatt vertsdefinisjonen for " + entry["name"] + "?", QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+                        if answer != QtWidgets.QMessageBox.Yes:
+                            continue
+                    merged[entry["id"]] = entry
+                payload = json.dumps({"schema": SCHEMA, "units": "mm", "tools": list(merged.values())}, ensure_ascii=False, separators=(",", ":")).encode()
+                request(address, key, "/api/tools", "PUT", payload, etag)
                 return
             if action.startswith("Importer"):
                 source, _ = QtWidgets.QFileDialog.getOpenFileName(parent, "Velg bibliotek", "", "OpenSpindle (*.osptools)")
