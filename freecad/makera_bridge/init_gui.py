@@ -23,6 +23,7 @@ class CAMToolbar:
             {'append': 'MakeraBridge_NewZ1Job', 'toolBar': 'Makera Bridge'},
             {'append': 'MakeraBridge_Prepare', 'toolBar': 'Makera Bridge'},
             {'append': 'MakeraBridge_SendOperation', 'toolBar': 'Makera Bridge'},
+            {'append': 'MakeraBridge_SharedTools', 'toolBar': 'Makera Bridge'},
         ]
 
 
