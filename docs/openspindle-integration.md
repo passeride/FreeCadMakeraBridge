@@ -22,6 +22,13 @@ and remain a prerequisite for using that receiver; this new path bypasses it.
 
 ## Z1 approach after a tool change
 
+The bundled Z1 and Z1 Pro Machine profiles set **Post Tool Change** to a
+metric, absolute lift to machine Z-3, a wait, a rapid to the nominal centre
+of the work area at machine X-100 Y-100, and a second wait. This runs after
+M6 and before the spindle starts. The centre is in machine coordinates,
+independent of the job's work origin. Use an OpenSpindle build that accepts
+this clearance-then-XY sequence in cutting operations.
+
 The bundled `makera_z1_bridge` post is used for **Ny Z1-jobb** and can also be
 selected through its Machine on an existing three-axis job. In absolute,
 metric three-axis output it separates a recognized first rapid approach
