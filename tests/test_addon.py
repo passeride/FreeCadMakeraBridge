@@ -169,6 +169,7 @@ class AddonTests(unittest.TestCase):
                 patch.object(commands, 'receiver_path', return_value=Path('OpenSpindle.exe')),
                 patch.object(commands, 'postprocess', return_value=('G1 X1', 'makera')) as post,
                 patch.object(commands, 'publish', return_value=(Path('program.nc'), {})) as publish,
+                patch('freecad.makera_bridge.reference.export_reference', return_value={'name': 'Finish', 'model': 'fixture'}) as reference,
                 patch.object(commands, 'launch') as launch,
             ):
                 commands.run(operation_only=operation_only)
@@ -176,6 +177,8 @@ class AddonTests(unittest.TestCase):
                     post.assert_called_once_with(job, [second])
                 else:
                     post.assert_called_once_with(job)
+                reference.assert_called_once_with(job)
+                self.assertEqual(publish.call_args.args[3], reference.return_value)
                 source = publish.call_args.args[2]
                 self.assertEqual(source['scope'], 'operation' if operation_only else 'job')
                 self.assertEqual(commands.export_label(source), 'Profil' if operation_only else 'Finish')
