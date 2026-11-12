@@ -79,11 +79,13 @@ class AddonTests(unittest.TestCase):
             module = importlib.import_module(name)
             gui.addWorkbench.assert_not_called()
             self.assertEqual([call.args[0] for call in gui.addCommand.call_args_list],
-                             ['MakeraBridge_Prepare', 'MakeraBridge_SendOperation', 'MakeraBridge_NewZ1Job'])
+                             ['MakeraBridge_SharedTools', 'MakeraBridge_Prepare', 'MakeraBridge_SendOperation', 'MakeraBridge_NewZ1Job'])
             for call in gui.addCommand.call_args_list:
                 icon = call.args[1].GetResources()['Pixmap']
                 if call.args[0] == 'MakeraBridge_NewZ1Job':
                     self.assertEqual(icon, 'CAM_Job')
+                elif call.args[0] == 'MakeraBridge_SharedTools':
+                    self.assertEqual(icon, 'CAM_ToolLibraryEdit')
                 else:
                     self.assertTrue(Path(icon).is_file())
             gui.addPreferencePage.assert_called_once_with(commands.OpenSpindlePreferences, 'Makera Bridge')
@@ -91,7 +93,8 @@ class AddonTests(unittest.TestCase):
             expected = [{'append': 'Makera Bridge', 'toolBar': ''},
                         {'append': 'MakeraBridge_NewZ1Job', 'toolBar': 'Makera Bridge'},
                         {'append': 'MakeraBridge_Prepare', 'toolBar': 'Makera Bridge'},
-                        {'append': 'MakeraBridge_SendOperation', 'toolBar': 'Makera Bridge'}]
+                        {'append': 'MakeraBridge_SendOperation', 'toolBar': 'Makera Bridge'},
+                        {'append': 'MakeraBridge_SharedTools', 'toolBar': 'Makera Bridge'}]
             self.assertEqual(module.manipulator.modifyToolBars(), expected)
             # Re-activation yields the same declarative tree, not growing UI state.
             self.assertEqual(module.manipulator.modifyToolBars(), expected)

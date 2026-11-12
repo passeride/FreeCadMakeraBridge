@@ -22,13 +22,6 @@ and remain a prerequisite for using that receiver; this new path bypasses it.
 
 ## Z1 approach after a tool change
 
-The bundled Z1 and Z1 Pro Machine profiles set **Post Tool Change** to a
-metric, absolute lift to machine Z-3, a wait, a rapid to the nominal centre
-of the work area at machine X-100 Y-100, and a second wait. This runs after
-M6 and before the spindle starts. The centre is in machine coordinates,
-independent of the job's work origin. Use an OpenSpindle build that accepts
-this clearance-then-XY sequence in cutting operations.
-
 The bundled `makera_z1_bridge` post is used for **Ny Z1-jobb** and can also be
 selected through its Machine on an existing three-axis job. In absolute,
 metric three-axis output it separates a recognized first rapid approach
@@ -112,3 +105,9 @@ Send job and Send operation publish a self-contained `.ospjob` alongside the ori
 The reference is the CAM Job's `Model.Group` resource clones, not the original body's unplaced shape. Tessellation is 0.05 mm, with parent placement baked relative to `Shape.Placement` once. Coordinates are mm/Z-up in the job's work frame with no centring or translation by the stock minimum. The stock's work-coordinate bounds accompany it. Models exceeding 100,000 triangles, 32 objects, ±10,000 mm, or a 64 MiB package fail with an explanation; no misaligned substitute is silently sent. These limits apply to display geometry only. Current work-plane/rotary limitations remain subject to the receiver's NC capability checks.
 
 Material dictionaries or linked material objects on the authored body are read where available. Name, view colour, known shininess/transparency, convertible density and selected physical-property strings are transferred. Bare density numbers are not assigned guessed units. When a single body's stock has no material, its material is used for the stock. Unknown names remain unknown and can be edited in OpenSpindle. No physical metadata supplies machining parameters. Live FreeCAD tessellation, linked/container placements, material-card variants and cross-app alignment need desktop verification before merging.
+
+## Shared tool library
+
+The CAM toolbar's **Felles OpenSpindle-verktøy** command imports `.osptools` into a new immutable ToolBit/library directory or exports the active CAM job's ToolControllers. Register the returned library directory in FreeCAD's tool-library manager. Imported definitions carry shared UUID, revision and the exchanged entry as ToolBit attributes. Export retains them on the ToolBit; unchanged entries preserve their incoming revision, while edited geometry creates a new revision. Machine T numbers are local and are not cutter identity. Existing job tool objects are never silently replaced by importing a library.
+
+The shared schema supports explicit millimetre flat, ball, V-bit and drill geometry and full included point angles. Incomplete/unsupported tools are reported. Machine offsets, holders, presets and measured lengths are not synchronized. This file workflow requires the matching shared-tool branches on both sides; networking is a later layer over the same representation.

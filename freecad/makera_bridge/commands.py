@@ -17,6 +17,17 @@ MAX_BYTES = 10 * 1024 * 1024
 PREFERENCES_PATH = "User parameter:BaseApp/Preferences/Macro/SendToOpenSpindle"
 
 
+def atomic_text(path, text):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + "." + uuid.uuid4().hex + ".tmp")
+    try:
+        temporary.write_text(text, encoding="utf-8")
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def validate_nc(gcode):
     if not isinstance(gcode, str) or not gcode.strip():
         raise ValueError("Ingen G-kode ble generert.")
@@ -598,6 +609,8 @@ class SendOperationCommand:
 
 def register():
     import FreeCADGui as Gui
+    from .shared_tools import SharedToolsCommand
+    Gui.addCommand("MakeraBridge_SharedTools", SharedToolsCommand())
     Gui.addCommand("MakeraBridge_Prepare", PrepareCommand())
     Gui.addCommand("MakeraBridge_SendOperation", SendOperationCommand())
     Gui.addPreferencePage(OpenSpindlePreferences, "Makera Bridge")
