@@ -496,13 +496,19 @@ def run(operation_only=False):
             job = get_job(doc, selection)
 
         prefs = preferences()
+        remote_host = prefs.GetString("HostURL", "").strip()
         saved_executable = prefs.GetString("Executable", "").strip()
-        receiver = resolve_receiver(saved_executable, parent)
-        if receiver is None:
-            return
-        executable, should_open = receiver
-        if should_open and executable != saved_executable:
-            prefs.SetString("Executable", executable)
+        executable, should_open = saved_executable, False
+        if remote_host:
+            from .remote import settings
+            settings(prefs)
+        else:
+            receiver = resolve_receiver(saved_executable, parent)
+            if receiver is None:
+                return
+            executable, should_open = receiver
+            if should_open and executable != saved_executable:
+                prefs.SetString("Executable", executable)
         folder = prefs.GetString("Exports", "").strip() or default_export_folder()
 
         check_job(job)
@@ -519,7 +525,12 @@ def run(operation_only=False):
         from .reference import export_reference
         reference = export_reference(job)
         path, _ = publish(folder, with_tool_comments(gcode, controllers), source, reference)
-        if should_open:
+        if remote_host:
+            from .remote import send_package
+            address, receipt = send_package(path, prefs)
+            App.Console.PrintMessage("OpenSpindle: mottatt på vert, ikke startet: " + receipt["id"] + "\n")
+            QtGui.QDesktopServices.openUrl(QtCore.QUrl(address))
+        elif should_open:
             try:
                 launch(executable, path)
             except (OSError, ValueError) as exc:
@@ -539,6 +550,11 @@ class OpenSpindlePreferences:
         layout = QtWidgets.QFormLayout(self.form)
         self.executable = QtWidgets.QLineEdit()
         self.folder = QtWidgets.QLineEdit()
+        self.host_url = QtWidgets.QLineEdit()
+        self.host_key = QtWidgets.QLineEdit()
+        self.host_key.setEchoMode(QtWidgets.QLineEdit.Password)
+        layout.addRow("Vertsadresse (tom = lokal app)", self.host_url)
+        layout.addRow("Tilgangsnøkkel (lokal innstilling)", self.host_key)
         for label, field, pick in (
             ("OpenSpindle-program", self.executable, lambda: browse_receiver(self.form)),
             ("Eksportmappe", self.folder, lambda: QtWidgets.QFileDialog.getExistingDirectory(
@@ -560,11 +576,15 @@ class OpenSpindlePreferences:
 
     def loadSettings(self):
         prefs = preferences()
+        self.host_url.setText(prefs.GetString("HostURL", ""))
+        self.host_key.setText(prefs.GetString("HostKey", ""))
         self.executable.setText(prefs.GetString("Executable", ""))
         self.folder.setText(prefs.GetString("Exports", "") or default_export_folder())
 
     def saveSettings(self):
         prefs = preferences()
+        prefs.SetString("HostURL", self.host_url.text().strip())
+        prefs.SetString("HostKey", self.host_key.text().strip())
         prefs.SetString("Executable", self.executable.text().strip())
         prefs.SetString("Exports", self.folder.text().strip())
 
