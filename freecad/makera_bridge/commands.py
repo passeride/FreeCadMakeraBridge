@@ -44,7 +44,7 @@ def export_label(source):
     return document or operation or "CAM"
 
 
-def publish(folder, gcode, source):
+def publish(folder, gcode, source, reference=None):
     """Publish a complete snapshot directory atomically."""
     data = validate_nc(gcode)
     base = Path(folder).expanduser().resolve()
@@ -68,12 +68,23 @@ def publish(folder, gcode, source):
     }
     try:
         (staging / (label + ".nc")).write_bytes(data)
+        if reference is not None:
+            model, stock, material = reference
+            bundle = {"schema": "freecad-openspindle-job/1",
+                      "program": {"name": label + ".nc", "nc": gcode, "sha256": revision},
+                      "reference": model, "stock": stock, "material": material}
+            encoded = json.dumps(bundle, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
+            if len(encoded) > 64 * 1024 * 1024:
+                raise ValueError("Modellpakken overskrider 64 MiB.")
+            (staging / (label + ".ospjob")).write_bytes(encoded)
+            manifest["display_bundle"] = {"filename": label + ".ospjob", "bytes": len(encoded),
+                                          "sha256": hashlib.sha256(encoded).hexdigest()}
         (staging / "handoff.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
         os.rename(staging, final)
     finally:
         if staging.exists():
             shutil.rmtree(staging)
-    return final / (label + ".nc"), manifest
+    return final / (label + (".ospjob" if reference is not None else ".nc")), manifest
 
 
 DOWNLOAD_URL = "https://github.com/openspindle/openspindle/releases"
@@ -144,8 +155,8 @@ def launch(executable, nc_path, platform=None, popen=subprocess.Popen):
     platform = platform or sys.platform
     app = receiver_path(executable, platform)
     nc = Path(nc_path).resolve(strict=True)
-    if nc.suffix.lower() != ".nc":
-        raise ValueError("Velg en .nc-fil.")
+    if nc.suffix.lower() not in (".nc", ".ospjob"):
+        raise ValueError("Velg en .nc- eller .ospjob-fil.")
     if platform == "darwin" and app.suffix.lower() == ".app":
         args = ["/usr/bin/open", "-a", str(app), str(nc)]
     else:
@@ -494,7 +505,9 @@ def run(operation_only=False):
         source = source_metadata(job, post, App.Version(), operations)
         source["scope"] = "operation" if operation_only else "job"
         controllers = (PathUtil.toolControllerForOp(op) for op in operations)
-        path, _ = publish(folder, with_tool_comments(gcode, controllers), source)
+        from .reference import export_reference
+        reference = export_reference(job)
+        path, _ = publish(folder, with_tool_comments(gcode, controllers), source, reference)
         if should_open:
             try:
                 launch(executable, path)

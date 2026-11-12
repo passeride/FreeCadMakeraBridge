@@ -103,3 +103,12 @@ The existing Fusion pairing service runs in Fusion and is queried by OpenSpindle
 it is not a generic NC upload endpoint. A future FreeCAD adapter should negotiate
 capabilities and confirm the imported revision before showing an Imported badge.
 It must bind replies to source/revision/session and never replay machine start.
+
+
+## Finished model and material package
+
+Send job and Send operation publish a self-contained `.ospjob` alongside the original `.nc` and `handoff.json`, then open the package in OpenSpindle. This requires the matching model/material branch of OpenSpindle; older releases can open the plain NC manually. The package uses schema `freecad-openspindle-job/1`. Its NC hash is checked by the receiver; geometry/material metadata is validated and never becomes executable NC.
+
+The reference is the CAM Job's `Model.Group` resource clones, not the original body's unplaced shape. Tessellation is 0.05 mm, with parent placement baked relative to `Shape.Placement` once. Coordinates are mm/Z-up in the job's work frame with no centring or translation by the stock minimum. The stock's work-coordinate bounds accompany it. Models exceeding 100,000 triangles, 32 objects, ±10,000 mm, or a 64 MiB package fail with an explanation; no misaligned substitute is silently sent. These limits apply to display geometry only. Current work-plane/rotary limitations remain subject to the receiver's NC capability checks.
+
+Material dictionaries or linked material objects on the authored body are read where available. Name, view colour, known shininess/transparency, convertible density and selected physical-property strings are transferred. Bare density numbers are not assigned guessed units. When a single body's stock has no material, its material is used for the stock. Unknown names remain unknown and can be edited in OpenSpindle. No physical metadata supplies machining parameters. Live FreeCAD tessellation, linked/container placements, material-card variants and cross-app alignment need desktop verification before merging.
