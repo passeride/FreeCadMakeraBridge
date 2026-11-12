@@ -114,7 +114,8 @@
     "file_name": "makera_z1_bridge",
     "properties": {
       "axis_precision": 3,
-      "feed_precision": 2
+      "feed_precision": 2,
+      "post_tool_change": "G21 G90\nG53 G0 Z-3\nM400\nG53 G0 X-100 Y-100\nM400"
     }
   },
   "processing": {
