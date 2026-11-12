@@ -79,11 +79,13 @@ class AddonTests(unittest.TestCase):
             module = importlib.import_module(name)
             gui.addWorkbench.assert_not_called()
             self.assertEqual([call.args[0] for call in gui.addCommand.call_args_list],
-                             ['MakeraBridge_Prepare', 'MakeraBridge_SendOperation', 'MakeraBridge_NewZ1Job'])
+                             ['MakeraBridge_SharedTools', 'MakeraBridge_Prepare', 'MakeraBridge_SendOperation', 'MakeraBridge_NewZ1Job'])
             for call in gui.addCommand.call_args_list:
                 icon = call.args[1].GetResources()['Pixmap']
                 if call.args[0] == 'MakeraBridge_NewZ1Job':
                     self.assertEqual(icon, 'CAM_Job')
+                elif call.args[0] == 'MakeraBridge_SharedTools':
+                    self.assertEqual(icon, 'CAM_ToolLibraryEdit')
                 else:
                     self.assertTrue(Path(icon).is_file())
             gui.addPreferencePage.assert_called_once_with(commands.OpenSpindlePreferences, 'Makera Bridge')
@@ -91,7 +93,8 @@ class AddonTests(unittest.TestCase):
             expected = [{'append': 'Makera Bridge', 'toolBar': ''},
                         {'append': 'MakeraBridge_NewZ1Job', 'toolBar': 'Makera Bridge'},
                         {'append': 'MakeraBridge_Prepare', 'toolBar': 'Makera Bridge'},
-                        {'append': 'MakeraBridge_SendOperation', 'toolBar': 'Makera Bridge'}]
+                        {'append': 'MakeraBridge_SendOperation', 'toolBar': 'Makera Bridge'},
+                        {'append': 'MakeraBridge_SharedTools', 'toolBar': 'Makera Bridge'}]
             self.assertEqual(module.manipulator.modifyToolBars(), expected)
             # Re-activation yields the same declarative tree, not growing UI state.
             self.assertEqual(module.manipulator.modifyToolBars(), expected)
@@ -169,6 +172,7 @@ class AddonTests(unittest.TestCase):
                 patch.object(commands, 'receiver_path', return_value=Path('OpenSpindle.exe')),
                 patch.object(commands, 'postprocess', return_value=('G1 X1', 'makera')) as post,
                 patch.object(commands, 'publish', return_value=(Path('program.nc'), {})) as publish,
+                patch('freecad.makera_bridge.reference.export_reference', return_value={'name': 'Finish', 'model': 'fixture'}) as reference,
                 patch.object(commands, 'launch') as launch,
             ):
                 commands.run(operation_only=operation_only)
@@ -176,6 +180,8 @@ class AddonTests(unittest.TestCase):
                     post.assert_called_once_with(job, [second])
                 else:
                     post.assert_called_once_with(job)
+                reference.assert_called_once_with(job)
+                self.assertEqual(publish.call_args.args[3], reference.return_value)
                 source = publish.call_args.args[2]
                 self.assertEqual(source['scope'], 'operation' if operation_only else 'job')
                 self.assertEqual(commands.export_label(source), 'Profil' if operation_only else 'Finish')
